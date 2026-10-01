@@ -8,6 +8,8 @@ class Metrics:
     human_escalations: int = 0
     verification_failures: int = 0
     injection_blocks: int = 0
+    rate_limit_blocks: int = 0
+    budget_blocks: int = 0
     cache_hits: int = 0
     fast_path_answers: int = 0
     llm_calls: int = 0
@@ -17,7 +19,6 @@ class Metrics:
     total_latency_ms: float = 0
 
     def record(self, event: str, latency_ms: float = 0, **usage):
-        # Only a completed answer/abstention represents a real user request.
         if event in {"answer", "abstention"}:
             self.requests += 1
             self.total_latency_ms += latency_ms
@@ -26,6 +27,8 @@ class Metrics:
         if event == "human_escalation": self.human_escalations += 1
         if event == "verification_failure": self.verification_failures += 1
         if event == "security_block": self.injection_blocks += 1
+        if event == "rate_limit_block": self.rate_limit_blocks += 1
+        if event == "budget_block": self.budget_blocks += 1
         if event == "cache_hit": self.cache_hits += 1
         if event == "fast_path": self.fast_path_answers += 1
         if event == "llm_call": self.llm_calls += 1
@@ -41,6 +44,8 @@ class Metrics:
             "human_escalations": self.human_escalations,
             "verification_failures": self.verification_failures,
             "injection_blocks": self.injection_blocks,
+            "rate_limit_blocks": self.rate_limit_blocks,
+            "budget_blocks": self.budget_blocks,
             "cache_hits": self.cache_hits,
             "cache_hit_rate": round(self.cache_hits / self.requests, 4) if self.requests else 0,
             "fast_path_answers": self.fast_path_answers,
