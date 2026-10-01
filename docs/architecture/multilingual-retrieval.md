@@ -1,32 +1,44 @@
 # Native multilingual retrieval
 
-CoachAI supports two retrieval strategies.
+CoachAI now supports native cross-language retrieval as an optional local layer.
 
-## Default development mode
+The model used by the adapter is intfloat/multilingual-e5-small. Its current model card lists 94 languages and a 384-dimensional hidden size. The repository includes a main safetensors weight file of about 471 MB. citeturn272176search0turn272176search2turn272176search7
 
-The deterministic hash embedding remains the default so the project can run without downloading model weights.
+## Modes
 
-## Optional local multilingual mode
+Set MULTILINGUAL_EMBEDDING_PROVIDER=auto:
 
-Set:
+- If sentence-transformers is installed, CoachAI uses the local multilingual embedding provider.
+- Otherwise it falls back safely to the deterministic test embedding provider.
 
-    MULTILINGUAL_EMBEDDING_PROVIDER=local_e5
+Set MULTILINGUAL_EMBEDDING_PROVIDER=hash to force the lightweight offline test path.
 
-This enables intfloat/multilingual-e5-small, a 384-dimensional multilingual embedding model. The current model card lists 94 languages. It uses query and passage prefixes so a question and an evidence passage can be represented in the same vector space even when the languages differ.
+Set MULTILINGUAL_EMBEDDING_PROVIDER=local_e5 to require native multilingual retrieval and fail fast if the optional dependency is missing.
 
-The retrieval path becomes:
+Install the optional dependency with:
 
-student asks in Hindi/Telugu/Tamil
--> multilingual embedding
+    pip install -e ".[multilingual]"
+
+## Runtime path
+
+Hindi/Telugu/Tamil/etc. question
+-> direct multilingual query embedding
 -> English source chunks
 -> hybrid ranking
+-> adaptive evidence
 -> verification
 -> answer in requested language
 
-No translation API call is needed for retrieval.
+This removes the translation round-trip from retrieval when native multilingual embeddings are enabled.
 
 ## Cost trade-off
 
-There is a one-time model download and local CPU/RAM cost, but no per-query translation API charge. The production choice should be based on the real corpus' retrieval and latency benchmark.
+The model creates a fixed local CPU/RAM cost and a one-time model download, but it avoids per-question translation calls for retrieval.
 
-Translation support remains available as a fallback because the correct production decision should be measured rather than assumed.
+Before production, benchmark the real corpus using Recall@K, NDCG/MRR, p50/p95 latency, CPU/RAM, translation calls avoided and total cost per 1,000 questions.
+
+The repository includes a small benchmark command:
+
+    coachai-multilingual-benchmark --provider local_e5
+
+The benchmark is intentionally not treated as a production quality proof. Replace its sample cases with real coaching-centre multilingual golden questions.
