@@ -14,6 +14,7 @@ class ManagedDocument:
     status: str
     uploaded_at: datetime
     approved_by: str | None = None
+    source_uri: str | None = None
 
 class InMemoryDocumentRegistry:
     """Development registry mirroring the production document lifecycle."""
@@ -35,6 +36,12 @@ class InMemoryDocumentRegistry:
 
     def list(self) -> list[ManagedDocument]:
         return sorted(self.documents.values(), key=lambda d: d.uploaded_at, reverse=True)
+
+    def counts(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for item in self.documents.values():
+            counts[item.status] = counts.get(item.status, 0) + 1
+        return counts
 
     def get(self, document_id: str) -> ManagedDocument:
         try:
@@ -61,6 +68,10 @@ class InMemoryDocumentRegistry:
         target.status = DocumentStatus.ACTIVE
         target.approved_by = approved_by
         return archived
+
+    def set_status(self, document_id: str, status: str) -> None:
+        target = self.get(document_id)
+        target.status = status
 
     def reject(self, document_id: str, reviewer: str) -> None:
         target = self.get(document_id)
