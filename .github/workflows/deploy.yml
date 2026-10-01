@@ -42,6 +42,10 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Bootstrap ECR
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve -target=aws_ecr_repository.app -target=aws_ecr_lifecycle_policy.app
+
       - name: Login to ECR
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
