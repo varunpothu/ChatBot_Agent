@@ -15,6 +15,7 @@ from agents.budget import CloudBudget
 from agents.cache import TTLCache
 from agents.groq_model import GroqAnswerModel
 from agents.orchestrator import CoachAIOrchestrator
+from language.messages import message as localized_message
 from language.registry import get_language
 from knowledge.chunker import semantic_chunks
 from knowledge.document_registry import ManagedDocument, documents
@@ -90,7 +91,11 @@ async def config():
     return {"tts_mode":os.getenv("TTS_MODE","browser"),"llm_provider":os.getenv("LLM_PROVIDER","auto"),"translation_provider":os.getenv("TRANSLATION_PROVIDER","none"),"fast_path_default":True,"governed_ingestion":True}
 
 @app.get("/languages")
-async def languages():return [{"code":"auto","name":"Auto-detect","native_name":"Auto-detect"}]+language_capabilities()
+async def languages():
+    items=[{"code":"auto","name":"Auto-detect","native_name":"Auto-detect"}]+language_capabilities()
+    for item in items:
+        item["greeting"]=localized_message("greeting", item["code"] if item["code"]!="auto" else "en-GB")
+    return items
 
 @app.get("/health")
 async def health():
