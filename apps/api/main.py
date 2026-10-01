@@ -200,7 +200,8 @@ def get_retriever()->HybridRetriever|PostgresHybridRetriever:
 async def chat(request:Request,payload:ChatRequest):
     principal=require_principal(request)
     started=time.perf_counter()
-    client_key=request.client.host if request.client else "unknown"
+    client_ip=request.client.host if request.client else "unknown"
+    client_key=f"{principal.user_id}:{client_ip}"
     if not rate_limiter.allow(client_key):
         metrics.record("rate_limit_block");raise HTTPException(429,"Too many requests. Please try again shortly.",headers={"Retry-After":"60"})
     if payload.language!="auto":
