@@ -26,6 +26,18 @@ class CoachAIOrchestrator:
     def __post_init__(self) -> None:
         self.cache = TTLCache(ttl_seconds=self.policy.cache_ttl_seconds)
 
+    @staticmethod
+    def _adaptive_results(results):
+        if len(results) <= 1:
+            return results
+        top = results[0].final_score
+        second = results[1].final_score
+        if top >= 0.72 and (top - second) >= 0.12:
+            return results[:1]
+        if top >= 0.48 and (top - second) >= 0.10:
+            return results[:2]
+        return results[:3]
+
     async def run(self, message: str, conversation_id: str | None = None, style: str = "friendly", voice_id: str = "Brian") -> dict[str, Any]:
         message = " ".join(message.split())[: self.policy.max_input_chars]
         resolved_message = memory.resolve(conversation_id, message)
@@ -75,7 +87,9 @@ class CoachAIOrchestrator:
             memory.remember(conversation_id, resolved_message, route.intent)
             return result
 
+        results = self._adaptive_results(results)
         evidence = trim_evidence([r.chunk.text for r in results], self.policy.max_evidence_chars)
+
         budget_blocked = False
         use_llm = route.answer_mode == "deep" and self.answer_model is not None and self.policy.llm_enabled
         if use_llm and not self.cloud_budget.allow():
