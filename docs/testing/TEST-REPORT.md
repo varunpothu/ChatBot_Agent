@@ -34,12 +34,12 @@ This report covers the automated tests and production-test scaffolding added to 
 
 ### Verified in this environment
 
-- A real GitHub Actions AI Quality Gate completed successfully for commit 58623983d2fb4921e77149ed418f0bff5219388d.
+- A real GitHub Actions AI Quality Gate completed successfully for commit d36c7c5a969bb5c84be5479ea4914c3a65447fb5.
 - Unit/quality job: passed, including deterministic retrieval/grounding gate, broader quality benchmark and compile/static checks.
 - PostgreSQL/Redis integration job: passed against GitHub-hosted PostgreSQL with pgvector and Redis service containers.
 - Terraform validation job: passed.
 - Package smoke-test job: passed.
-- The verified workflow run is https://github.com/varunpothu/ChatBot_Agent/actions/runs/36913070009.
+- The verified workflow run is https://github.com/varunpothu/ChatBot_Agent/actions/runs/36913480280.
 
 ### Not executed here
 
@@ -60,5 +60,14 @@ Passing unit tests demonstrates that the deterministic software contracts behave
 
 The successful unit job reported 55 passed, 1 skipped and 4 deselected before the deterministic quality and benchmark steps completed successfully. The PostgreSQL/Redis integration job also completed successfully.
 
-Workflow: https://github.com/varunpothu/ChatBot_Agent/actions/runs/36912758911
-Commit: b9b2691df45d882e151daf584aafda3430bef72e
+Workflow: https://github.com/varunpothu/ChatBot_Agent/actions/runs/36913480280
+Commit: d36c7c5a969bb5c84be5479ea4914c3a65447fb5
+
+
+## Final automated evidence
+
+AI Quality Gate: https://github.com/varunpothu/ChatBot_Agent/actions/runs/36913480280
+
+Commit: d36c7c5a969bb5c84be5479ea4914c3a65447fb5
+
+Unit/quality: 56 passed, 1 skipped, 4 deselected; deterministic quality gate passed; benchmark passed; compile passed. PostgreSQL/Redis integration: 4 passed, 57 deselected. Terraform validation passed. Package build passed.
