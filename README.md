@@ -21,7 +21,7 @@ Production-oriented RAG coaching-centre assistant designed around four goals:
 
 ## Supported knowledge formats
 
-PDF, DOCX, PPTX, XLS/XLSX, CSV, TXT, Markdown, HTML and JSON are supported by the local ingestion pipeline. Image/OCR processing is isolated behind a provider boundary for production AWS integration.
+PDF, DOCX, PPTX, XLS/XLSX, CSV, TXT, Markdown, HTML, JSON and image uploads are supported. Image/scanned-document OCR uses the AWS Textract boundary when enabled in async ingestion.
 
 ## Multilingual support
 
@@ -51,6 +51,24 @@ The system intentionally avoids multi-agent LLM loops for ordinary questions. Ag
 For AWS, Bedrock prompt caching and intelligent prompt routing can provide additional optimization for supported models, but CoachAI's own deterministic fast/deep gate runs first so simple questions do not need model inference.
 
 For embeddings, the production schema keeps a 512-dimensional pgvector column so managed embedding workers can write durable vectors without recomputing the full corpus on each API restart. The current multilingual E5 path remains an explicit optional retrieval profile for cross-language evaluation.
+
+## Testing
+
+Run the deterministic unit and quality suite:
+
+    pytest -q -m "not integration"
+    python -m evaluation.ci_gate
+    python -m compileall agents rag knowledge monitoring governance evaluation ai_controls voice storage infra workers apps
+
+Run the real service integration suite when PostgreSQL/pgvector and Redis are available:
+
+    pytest -m integration -q
+
+Build the distribution smoke test with:
+
+    python -m build
+
+The complete test matrix and release evidence requirements are documented in `docs/testing/TESTING.md` and `docs/release/RELEASE-CHECKLIST.md`.
 
 ## Run locally
 
