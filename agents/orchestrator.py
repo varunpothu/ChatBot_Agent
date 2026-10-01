@@ -146,7 +146,7 @@ class CoachAIOrchestrator:
                 "max_output_tokens":self.policy.max_output_tokens,
             },
         }
-        self.cache.set(cache_key,result);memory.remember(conversation_id,retrieval_query,route.intent);return result
+        self.cache.set(cache_key,result);self.conversation_memory.remember(conversation_id,retrieval_query,route.intent);return result
 
     @staticmethod
     def _abstain(conversation_id,intent,reason,voice_meta):
