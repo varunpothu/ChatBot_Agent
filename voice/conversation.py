@@ -22,9 +22,9 @@ class ConversationTurn:
     language:str
     latency_ms:float
 
-def validate_preference(preference:VoicePreference,allowed_voice_ids:set[str],allowed_languages:set[str])->VoicePreference:
+def validate_preference(preference:VoicePreference,allowed_voice_ids:set[str],allowed_languages:set[str]|None=None)->VoicePreference:
     if preference.voice_id not in allowed_voice_ids:raise ValueError("Unknown voice")
-    if preference.language not in allowed_languages:raise ValueError("Unsupported language")
+    if allowed_languages is not None and preference.language not in allowed_languages:raise ValueError("Unsupported language")
     if preference.gender not in {"male","female"}:raise ValueError("Unsupported voice gender")
     if preference.style not in {"friendly","professional","concise"}:raise ValueError("Unsupported conversation style")
     return preference
