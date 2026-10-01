@@ -24,13 +24,7 @@ class CoachAIOrchestrator:
     def __post_init__(self) -> None:
         self.cache = TTLCache(ttl_seconds=self.policy.cache_ttl_seconds)
 
-    async def run(
-        self,
-        message: str,
-        conversation_id: str | None = None,
-        style: str = "friendly",
-        voice_id: str = "Brian",
-    ) -> dict[str, Any]:
+    async def run(self, message: str, conversation_id: str | None = None, style: str = "friendly", voice_id: str = "Brian") -> dict[str, Any]:
         message = " ".join(message.split())[: self.policy.max_input_chars]
         resolved_message = memory.resolve(conversation_id, message)
 
@@ -61,7 +55,7 @@ class CoachAIOrchestrator:
             return result
 
         if self.retriever is None:
-            return self._abstain(conversation_id, route.intent, "Knowledge base is not configured.")
+            return self._abstain(conversation_id, route.intent, "Knowledge base is not configured.", voice_id, style)
 
         cache_key = self.cache.key(resolved_message.lower(), style, str(self.knowledge_generation))
         cached = self.cache.get(cache_key)
@@ -75,7 +69,7 @@ class CoachAIOrchestrator:
 
         results = self.retriever.search(resolved_message, top_k=self.policy.retrieval_top_k)
         if not results or results[0].final_score < self.policy.low_score_threshold:
-            result = self._abstain(conversation_id, route.intent, "No sufficiently strong approved evidence was found.")
+            result = self._abstain(conversation_id, route.intent, "No sufficiently strong approved evidence was found.", voice_id, style)
             memory.remember(conversation_id, resolved_message, route.intent)
             return result
 
@@ -83,16 +77,30 @@ class CoachAIOrchestrator:
         use_llm = route.answer_mode == "deep" and self.answer_model is not None and self.policy.llm_enabled
         model = self.answer_model if use_llm else ExtractiveAnswerModel()
 
-        draft = await model.generate(resolved_message, evidence, style)
+        try:
+            draft = await model.generate(resolved_message, evidence, style)
+        except Exception as exc:
+            # A failed cloud call never makes the user wait forever. Fall back
+            # to the deterministic path, which remains grounded.
+            draft = await ExtractiveAnswerModel().generate(resolved_message, evidence, style)
+            use_llm = False
+            cloud_error = str(exc)[:160]
+        else:
+            cloud_error = None
+
         if draft.strip().upper() == "ABSTAIN":
-            result = self._abstain(conversation_id, route.intent, "The model could not produce an evidence-grounded answer.")
+            result = self._abstain(conversation_id, route.intent, "The model could not produce an evidence-grounded answer.", voice_id, style)
             memory.remember(conversation_id, resolved_message, route.intent)
             return result
 
-        answer = humanize_deep_answer(draft, style) if use_llm else humanize_factual_answer(draft, style)
+        answer = (
+            humanize_deep_answer(draft, style)
+            if use_llm
+            else humanize_factual_answer(draft, style, resolved_message)
+        )
         verification = verify_claims(answer, evidence)
         if not verification.grounded:
-            result = self._abstain(conversation_id, route.intent, "Answer failed grounding verification.")
+            result = self._abstain(conversation_id, route.intent, "Answer failed grounding verification.", voice_id, style)
             memory.remember(conversation_id, resolved_message, route.intent)
             return result
 
@@ -109,6 +117,8 @@ class CoachAIOrchestrator:
                 "path": "deep_llm" if use_llm else "fast_extract",
                 "cache_hit": False,
                 "llm_called": use_llm,
+                "cloud_fallback": cloud_error is not None,
+                "cloud_error": cloud_error,
                 "evidence_chunks": len(evidence),
                 "input_chars": len(resolved_message),
                 "evidence_chars": sum(len(x) for x in evidence),
@@ -120,7 +130,7 @@ class CoachAIOrchestrator:
         return result
 
     @staticmethod
-    def _abstain(conversation_id: str | None, intent: str, reason: str) -> dict[str, Any]:
+    def _abstain(conversation_id: str | None, intent: str, reason: str, voice_id: str = "Brian", style: str = "friendly") -> dict[str, Any]:
         return {
             "conversation_id": conversation_id,
             "answer": "I couldn't verify that in the approved coaching-centre documents, so I don't want to guess. A team member can help with this.",
@@ -128,4 +138,5 @@ class CoachAIOrchestrator:
             "abstained": True,
             "reason": reason,
             "next_action": "human_review",
+            "voice": {"voice_id": voice_id, "style": style},
         }
