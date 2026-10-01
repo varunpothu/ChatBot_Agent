@@ -22,6 +22,8 @@ from knowledge.document_registry import ManagedDocument, documents
 from knowledge.parsers import parse_document
 from monitoring.metrics import metrics
 from monitoring.alerts import evaluate_alerts
+from governance.registry import GovernanceRegistry
+from governance.runtime import GovernedPromptProvider, prompt_governance_required
 from ops.runtime import ops
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
 from rag.managed_embeddings import CachedEmbeddingProvider, build_bedrock_embedding_provider
@@ -60,15 +62,48 @@ shared_document_embedding_cache=None
 INGESTION_MODE=os.getenv("INGESTION_MODE","inline").lower()
 
 def build_cloud_model():
-    if os.getenv("LLM_ENABLED","true").lower()!="true":return None
+    prompt_provider=None
+    model_registry=None
+    model_governance_required=os.getenv("MODEL_GOVERNANCE_REQUIRED","false").lower()=="true"
+    if postgres_runtime:
+        model_registry=GovernanceRegistry(postgres_runtime)
+        prompt_provider=GovernedPromptProvider(model_registry, required=prompt_governance_required())
+
+    if os.getenv("LLM_ENABLED","true").lower()!="true":
+        return None
+
     provider=os.getenv("LLM_PROVIDER","auto").lower()
     try:
-        if provider=="bedrock":return BedrockAnswerModel()
-        if provider=="groq":return GroqAnswerModel()
-        if provider=="auto" and os.getenv("GROQ_API_KEY") and os.getenv("GROQ_MODEL"):return GroqAnswerModel()
-        if provider=="auto" and os.getenv("BEDROCK_MODEL_ID"):return BedrockAnswerModel()
-    except Exception:return None
+        if provider=="bedrock":
+            model_id=os.getenv("BEDROCK_MODEL_ID","amazon.nova-micro-v1:0")
+            if model_governance_required and model_registry:
+                active=model_registry.active_model("bedrock-answer")
+                if not active or active.model_name!=model_id:
+                    raise RuntimeError("Bedrock model is not approved and active in the governance registry")
+            return BedrockAnswerModel(model_id=model_id,prompt_provider=prompt_provider)
+
+        if provider=="groq":
+            model_id=os.getenv("GROQ_MODEL")
+            if model_governance_required and model_registry:
+                active=model_registry.active_model("groq-answer")
+                if not active or active.model_name!=model_id:
+                    raise RuntimeError("Groq model is not approved and active in the governance registry")
+            return GroqAnswerModel(model=model_id,prompt_provider=prompt_provider)
+
+        if provider=="auto" and os.getenv("GROQ_API_KEY") and os.getenv("GROQ_MODEL"):
+            return GroqAnswerModel(model=os.getenv("GROQ_MODEL"),prompt_provider=prompt_provider)
+
+        if provider=="auto" and os.getenv("BEDROCK_MODEL_ID"):
+            model_id=os.getenv("BEDROCK_MODEL_ID")
+            if model_governance_required and model_registry:
+                active=model_registry.active_model("bedrock-answer")
+                if not active or active.model_name!=model_id:
+                    raise RuntimeError("Bedrock model is not approved and active in the governance registry")
+            return BedrockAnswerModel(model_id=model_id,prompt_provider=prompt_provider)
+    except Exception:
+        return None
     return None
+
 
 REDIS_URL=os.getenv("REDIS_URL","").strip()
 if REDIS_URL:
