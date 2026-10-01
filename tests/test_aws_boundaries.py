@@ -22,7 +22,7 @@ def test_textract_maps_lines_to_source_locations():
     result = provider.detect_s3("bucket", "documents/file.png", filename="file.png")
 
     assert result.text == "First line\nSecond line"
-    assert [x.page for x in result.locations] == [1, 1]
+    assert [x.page for x in result.source_locations] == [1, 1]
 
 
 def test_transcribe_provider_reports_missing_optional_sdk(monkeypatch):
