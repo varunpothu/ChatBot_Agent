@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CoachAI</title><link rel="stylesheet" href="/web/styles.css">
+</head>
+<body>
+<main class="shell">
+<header><div><h1>CoachAI</h1><p>Grounded coaching-centre assistant</p></div><span id="status">● Ready</span></header>
+<section id="chat" class="chat"></section>
+<form id="composer">
+<button type="button" id="mic" title="Voice input">🎙</button>
+<input id="message" autocomplete="off" placeholder="Ask about courses, fees, admissions or schedules..." required>
+<button>Send</button>
+</form>
+<p class="note">Answers are generated only from approved knowledge sources. Unsupported questions are escalated instead of guessed.</p>
+</main>
+<script src="/web/app.js"></script>
+</body></html>
