@@ -16,9 +16,19 @@ class ScoredChunk:
     keyword_score:float
     final_score:float
 
+def _normalize_token(token:str)->str:
+    token=token.lower().strip()
+    if len(token) > 4 and token.endswith("ies"):
+        return token[:-3] + "y"
+    if len(token) > 4 and token.endswith("es"):
+        return token[:-2]
+    if len(token) > 3 and token.endswith("s"):
+        return token[:-1]
+    return token
+
 def tokenize(text:str)->set[str]:
-    tokens=set(re.findall(r"[a-zA-Z0-9£$€_.-]+",text.lower()))
-    return {t for t in tokens if t not in STOPWORDS}
+    tokens=re.findall(r"[a-zA-Z0-9£$€_.-]+",text.lower())
+    return {_normalize_token(t) for t in tokens if t not in STOPWORDS}
 
 def keyword_score(query:str,text:str)->float:
     q=tokenize(query);t=tokenize(text)
