@@ -41,6 +41,7 @@ voice = [
 coachai-multilingual-benchmark = "scripts.benchmark_multilingual:main"
 coachai-ingestion-worker = "workers.ingestion_worker:main"
 coachai-db-init = "storage.migrate:main"
+coachai-quality-benchmark = "evaluation.benchmark:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
