@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import hashlib
 import os
+import time
 
 @dataclass(frozen=True)
 class Voice:
@@ -37,6 +38,66 @@ class AmazonPollyProvider:
         import boto3
         self.client=boto3.client("polly",region_name=os.getenv("AWS_REGION","eu-west-2"))
         self.engine=os.getenv("POLLY_ENGINE","neural")
+        self.voice_cache_ttl=float(os.getenv("POLLY_VOICE_CACHE_TTL_SECONDS","21600"))
+        self._voice_cache={}
+
+
+    def discover_voices(self, language: str | None = None, engine: str | None = None) -> list[Voice]:
+        """Discover actual Polly voices for the configured region and engine."""
+        cache_key=(language or "", engine or self.engine)
+        cached=self._voice_cache.get(cache_key)
+        now=time.monotonic()
+        if cached and now-cached[0] < self.voice_cache_ttl:
+            return cached[1]
+
+        kwargs={"Engine":engine or self.engine}
+        if language:
+            kwargs["LanguageCode"]=language
+            kwargs["IncludeAdditionalLanguageCodes"]=True
+
+        voices=[]
+        token=None
+        while True:
+            if token:
+                kwargs["NextToken"]=token
+            else:
+                kwargs.pop("NextToken",None)
+            response=self.client.describe_voices(**kwargs)
+            for item in response.get("Voices",[]):
+                voice_id=item.get("Id","")
+                if voice_id:
+                    voices.append(
+                        Voice(
+                            voice_id,
+                            item.get("Name") or voice_id,
+                            item.get("LanguageCode",""),
+                            str(item.get("Gender","")).lower(),
+                            style="polly",
+                        )
+                    )
+            token=response.get("NextToken")
+            if not token:
+                break
+
+        self._voice_cache[cache_key]=(now,voices)
+        return voices
+
+    def resolve_voice(
+        self,
+        language: str,
+        gender: str,
+        requested_voice_id: str | None = None,
+        fallback_voice_id: str | None = None,
+    ) -> str | None:
+        candidates=self.discover_voices(language=language,engine=self.engine)
+        by_id={voice.voice_id:voice for voice in candidates}
+        if requested_voice_id in by_id:
+            return requested_voice_id
+        target_gender=gender.lower()
+        for voice in candidates:
+            if voice.gender.lower()==target_gender:
+                return voice.voice_id
+        return fallback_voice_id if fallback_voice_id in by_id else None
 
     @staticmethod
     def cache_key(text: str, voice_id: str, engine: str, language: str="") -> str:
