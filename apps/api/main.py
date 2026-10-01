@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
@@ -27,7 +28,9 @@ from ops.runtime import ops
 from security.rate_limit import SlidingWindowLimiter
 from voice.providers import VOICES, AmazonPollyProvider
 
-app = FastAPI(title="CoachAI API", version="1.2.0")
+load_dotenv()
+
+app = FastAPI(title="CoachAI API", version="1.3.0")
 store = InMemoryKnowledgeStore()
 retriever: HybridRetriever | None = None
 retriever_generation = -1
@@ -56,12 +59,10 @@ orchestrator = CoachAIOrchestrator(
     answer_model=build_cloud_model(),
     cloud_budget=CloudBudget(max_llm_calls_per_day=int(os.getenv("MAX_LLM_CALLS_PER_DAY", "1000"))),
 )
-rate_limiter = SlidingWindowLimiter(
-    max_requests=int(os.getenv("MAX_REQUESTS_PER_MINUTE", "30")),
-    window_seconds=60,
-)
+rate_limiter = SlidingWindowLimiter(max_requests=int(os.getenv("MAX_REQUESTS_PER_MINUTE", "30")), window_seconds=60)
 UPLOAD_DIR = Path(os.getenv("DOCUMENT_STORAGE_PATH", "data/documents"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_MB", "25")) * 1024 * 1024
 tts_cache = TTLCache(ttl_seconds=int(os.getenv("TTS_CACHE_TTL_SECONDS", "3600")), max_items=256)
 
 class ChatRequest(BaseModel):
@@ -155,10 +156,10 @@ def get_retriever() -> HybridRetriever:
 @app.post("/chat")
 async def chat(request: Request, payload: ChatRequest):
     started = time.perf_counter()
-    client_key = request.headers.get("X-Client-Id") or (request.client.host if request.client else "unknown")
+    client_key = request.client.host if request.client else "unknown"
     if not rate_limiter.allow(client_key):
         metrics.record("rate_limit_block")
-        raise HTTPException(429, "Too many requests. Please try again shortly.")
+        raise HTTPException(429, "Too many requests. Please try again shortly.", headers={"Retry-After": "60"})
     if payload.voice_id not in {v.voice_id for v in VOICES}: raise HTTPException(400, "Unknown voice")
     if payload.conversation_style not in {"friendly", "professional", "concise"}: raise HTTPException(400, "Unsupported conversation style")
 
@@ -175,6 +176,7 @@ async def chat(request: Request, payload: ChatRequest):
     if perf.get("budget_blocked"): metrics.record("budget_block")
     metrics.record("abstention" if result.get("abstained") else "answer", elapsed)
     if result.get("security_blocked"): metrics.record("security_block")
+
     review_id = None
     if result.get("next_action") == "human_review":
         item = ops.enqueue_review(result.get("reason", result.get("intent", "human_review")), payload.message, conversation_id)
@@ -194,10 +196,16 @@ async def upload_document(file: UploadFile = File(...)):
     content_hash = hashlib.sha256()
     document_id = uuid4().hex
     destination = UPLOAD_DIR / f"{document_id}{suffix}"
+    total_bytes = 0
     with destination.open("wb") as output:
         while chunk := file.file.read(1024 * 1024):
+            total_bytes += len(chunk)
+            if total_bytes > MAX_UPLOAD_BYTES:
+                destination.unlink(missing_ok=True)
+                raise HTTPException(413, f"File exceeds MAX_UPLOAD_MB={MAX_UPLOAD_BYTES // (1024*1024)}.")
             content_hash.update(chunk)
             output.write(chunk)
+
     digest = content_hash.hexdigest()
     if any(d.content_hash == digest for d in documents.documents.values()):
         destination.unlink(missing_ok=True)
