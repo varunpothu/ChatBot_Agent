@@ -9,6 +9,8 @@ import time
 
 from knowledge.chunker import semantic_chunks
 from knowledge.parsers import parse_document
+from knowledge.document_types import detect_type, DocumentType
+from knowledge.textract import AmazonTextractProvider
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
 from rag.managed_embeddings import CachedEmbeddingProvider, build_bedrock_embedding_provider
 from storage.postgres import PostgresRuntime
@@ -42,7 +44,29 @@ class IngestionWorker:
             digest=hashlib.sha256(destination.read_bytes()).hexdigest()
             if digest != payload["content_hash"]:
                 raise ValueError("S3 object hash does not match the upload manifest")
-            normalized = parse_document(destination)
+            normalized = parse_document(destination) if detect_type(payload["filename"]) != DocumentType.IMAGE else None
+            if os.getenv("OCR_PROVIDER", "none").lower() == "textract" and (
+                normalized is None or not normalized.text.strip()
+            ):
+                textract = AmazonTextractProvider(region=os.getenv("AWS_REGION", "eu-west-2"))
+                if suffix == ".pdf":
+                    normalized = textract.detect_s3_async(
+                        bucket,
+                        key,
+                        filename=payload["filename"],
+                        timeout_seconds=int(os.getenv("TEXTRACT_TIMEOUT_SECONDS", "180")),
+                        poll_seconds=float(os.getenv("TEXTRACT_POLL_SECONDS", "2")),
+                    )
+                else:
+                    normalized = textract.detect_s3(
+                        bucket,
+                        key,
+                        filename=payload["filename"],
+                    )
+            if normalized is None:
+                raise ValueError("Image document requires OCR_PROVIDER=textract in async ingestion mode")
+            if not normalized.text.strip():
+                raise ValueError("No extractable text was found in the document")
             chunks = semantic_chunks(normalized)
             metadata = self.documents.get(document_id)
             document_metadata = DocumentMetadata(
