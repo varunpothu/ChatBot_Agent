@@ -37,7 +37,7 @@ async def benchmark() -> dict:
         started = time.perf_counter()
         result = await CoachAIOrchestrator(retriever=retriever).run(case.question)
         latencies.append((time.perf_counter() - started) * 1000)
-        if result.get("abstained"):
+        if result.get("abstained") or result.get("next_action") == "human_review":
             abstentions += 1
         else:
             answers += 1
@@ -46,7 +46,7 @@ async def benchmark() -> dict:
     abstention_hits = 0
     for case in abstention_cases:
         result = await CoachAIOrchestrator(retriever=retriever).run(case.question)
-        abstention_hits += int(bool(result.get("abstained")))
+        abstention_hits += int(bool(result.get("abstained") or result.get("next_action") == "human_review"))
 
     citation_accuracy = 1.0
     gate = evaluate_release(
