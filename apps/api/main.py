@@ -15,16 +15,16 @@ from agents.budget import CloudBudget
 from agents.cache import TTLCache
 from agents.groq_model import GroqAnswerModel
 from agents.orchestrator import CoachAIOrchestrator
-from language.registry import LANGUAGES, get_language
+from language.registry import get_language
 from knowledge.chunker import semantic_chunks
 from knowledge.document_registry import ManagedDocument, documents
 from knowledge.parsers import parse_document
-from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
-from rag.retrieval import HybridRetriever
-from rag.store import InMemoryKnowledgeStore
 from monitoring.metrics import metrics
 from monitoring.alerts import evaluate_alerts
 from ops.runtime import ops
+from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
+from rag.retrieval import HybridRetriever
+from rag.store import InMemoryKnowledgeStore
 from security.rate_limit import SlidingWindowLimiter
 from translation.service import TranslationService
 from voice.language_voices import available_polly_voice, language_capabilities
@@ -32,7 +32,7 @@ from voice.providers import VOICES, AmazonPollyProvider
 
 load_dotenv()
 
-app=FastAPI(title="CoachAI API",version="1.4.0")
+app=FastAPI(title="CoachAI API",version="1.5.0")
 store=InMemoryKnowledgeStore()
 retriever:HybridRetriever|None=None
 retriever_generation=-1
@@ -45,8 +45,7 @@ def build_cloud_model():
         if provider=="groq":return GroqAnswerModel()
         if provider=="auto" and os.getenv("GROQ_API_KEY") and os.getenv("GROQ_MODEL"):return GroqAnswerModel()
         if provider=="auto" and os.getenv("BEDROCK_MODEL_ID"):return BedrockAnswerModel()
-    except Exception:
-        return None
+    except Exception:return None
     return None
 
 orchestrator=CoachAIOrchestrator(
@@ -55,8 +54,7 @@ orchestrator=CoachAIOrchestrator(
     cloud_budget=CloudBudget(max_llm_calls_per_day=int(os.getenv("MAX_LLM_CALLS_PER_DAY","1000"))),
 )
 rate_limiter=SlidingWindowLimiter(int(os.getenv("MAX_REQUESTS_PER_MINUTE","30")),60)
-UPLOAD_DIR=Path(os.getenv("DOCUMENT_STORAGE_PATH","data/documents"))
-UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
+UPLOAD_DIR=Path(os.getenv("DOCUMENT_STORAGE_PATH","data/documents"));UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
 MAX_UPLOAD_BYTES=int(os.getenv("MAX_UPLOAD_MB","25"))*1024*1024
 tts_cache=TTLCache(ttl_seconds=int(os.getenv("TTS_CACHE_TTL_SECONDS","3600")),max_items=256)
 
@@ -89,7 +87,7 @@ async def dashboard():return FileResponse("web/dashboard.html")
 
 @app.get("/config")
 async def config():
-    return {"tts_mode":os.getenv("TTS_MODE","browser"),"llm_provider":os.getenv("LLM_PROVIDER","auto"),"fast_path_default":True,"governed_ingestion":True,"translation_provider":os.getenv("TRANSLATION_PROVIDER","none")}
+    return {"tts_mode":os.getenv("TTS_MODE","browser"),"llm_provider":os.getenv("LLM_PROVIDER","auto"),"translation_provider":os.getenv("TRANSLATION_PROVIDER","none"),"fast_path_default":True,"governed_ingestion":True}
 
 @app.get("/languages")
 async def languages():return [{"code":"auto","name":"Auto-detect","native_name":"Auto-detect"}]+language_capabilities()
@@ -115,8 +113,7 @@ async def list_documents():return [d.__dict__ for d in documents.list()]
 @app.post("/admin/documents/{document_id}/approve",dependencies=[Depends(require_admin)])
 async def approve_document(document_id:str,reviewer:str="admin"):
     try:
-        archived=documents.activate(document_id,reviewer)
-        store.set_document_status(document_id,DocumentStatus.ACTIVE)
+        archived=documents.activate(document_id,reviewer);store.set_document_status(document_id,DocumentStatus.ACTIVE)
         for archived_id in archived:store.set_document_status(archived_id,DocumentStatus.ARCHIVED)
         event=ops.audit("DOCUMENT_ACTIVATED",reviewer,document_id,{"archived_versions":archived})
         return {"status":"ACTIVE","document_id":document_id,"archived_versions":archived,"audit_event_id":event.event_id}
@@ -126,8 +123,7 @@ async def approve_document(document_id:str,reviewer:str="admin"):
 @app.post("/admin/documents/{document_id}/reject",dependencies=[Depends(require_admin)])
 async def reject_document(document_id:str,reviewer:str="admin"):
     try:
-        documents.reject(document_id,reviewer)
-        store.set_document_status(document_id,DocumentStatus.REJECTED)
+        documents.reject(document_id,reviewer);store.set_document_status(document_id,DocumentStatus.REJECTED)
         event=ops.audit("DOCUMENT_REJECTED",reviewer,document_id,{})
         return {"status":"REJECTED","document_id":document_id,"audit_event_id":event.event_id}
     except KeyError:raise HTTPException(404,"Document not found") from None
@@ -150,8 +146,7 @@ async def audit():return [e.__dict__ for e in reversed(ops.audit_events[-200:])]
 def get_retriever()->HybridRetriever:
     global retriever,retriever_generation
     if retriever is None or retriever_generation!=store.generation:
-        retriever=HybridRetriever(store.all())
-        retriever_generation=store.generation
+        retriever=HybridRetriever(store.all());retriever_generation=store.generation
     return retriever
 
 @app.post("/chat")
@@ -159,64 +154,55 @@ async def chat(request:Request,payload:ChatRequest):
     started=time.perf_counter()
     client_key=request.client.host if request.client else "unknown"
     if not rate_limiter.allow(client_key):
-        metrics.record("rate_limit_block")
-        raise HTTPException(429,"Too many requests. Please try again shortly.",headers={"Retry-After":"60"})
-    try:get_language(payload.language if payload.language!="auto" else "en-GB")
-    except ValueError:
-        if payload.language!="auto":raise HTTPException(400,"Unsupported language")
+        metrics.record("rate_limit_block");raise HTTPException(429,"Too many requests. Please try again shortly.",headers={"Retry-After":"60"})
+    if payload.language!="auto":
+        try:get_language(payload.language)
+        except ValueError:raise HTTPException(400,"Unsupported language") from None
     if payload.voice_id not in {v.voice_id for v in VOICES}:raise HTTPException(400,"Unknown voice")
     if payload.conversation_style not in {"friendly","professional","concise"}:raise HTTPException(400,"Unsupported conversation style")
 
     conversation_id=payload.conversation_id or uuid4().hex
-    orchestrator.retriever=get_retriever()
-    orchestrator.knowledge_generation=store.generation
+    orchestrator.retriever=get_retriever();orchestrator.knowledge_generation=store.generation
     result=await orchestrator.run(payload.message,conversation_id,payload.conversation_style,payload.voice_id,payload.language)
     elapsed=(time.perf_counter()-started)*1000
     perf=result.get("performance",{})
     if perf.get("cache_hit"):metrics.record("cache_hit")
     elif perf.get("llm_called"):metrics.record("llm_call",input_tokens=len(payload.message)//4,output_tokens=len(result.get("answer",""))//4)
     else:metrics.record("fast_path")
+    translation_calls=int(perf.get("query_translated",False))+int(perf.get("answer_translated",False))
+    if translation_calls:metrics.record("translation_call",translation_characters=len(payload.message)+len(result.get("answer","")))
+    if perf.get("budget_blocked"):metrics.record("budget_block")
     metrics.record("abstention" if result.get("abstained") else "answer",elapsed)
     if result.get("security_blocked"):metrics.record("security_block")
-    if perf.get("budget_blocked"):metrics.record("budget_block")
     review_id=None
     if result.get("next_action")=="human_review":
-        item=ops.enqueue_review(result.get("reason",result.get("intent","human_review")),payload.message,conversation_id)
-        review_id=item.review_id
-        metrics.record("human_escalation")
-        ops.audit("HUMAN_REVIEW_CREATED","system",review_id,{"intent":result.get("intent")})
+        item=ops.enqueue_review(result.get("reason",result.get("intent","human_review")),payload.message,conversation_id);review_id=item.review_id
+        metrics.record("human_escalation");ops.audit("HUMAN_REVIEW_CREATED","system",review_id,{"intent":result.get("intent")})
     result["conversation_id"]=conversation_id
     if review_id:result["review_id"]=review_id
     return result
 
 @app.post("/documents/upload")
 async def upload_document(file:UploadFile=File(...)):
-    suffix=Path(file.filename or "").suffix.lower()
-    allowed={".pdf",".docx",".pptx",".xlsx",".xls",".csv",".txt",".md",".html",".htm",".json"}
+    suffix=Path(file.filename or "").suffix.lower();allowed={".pdf",".docx",".pptx",".xlsx",".xls",".csv",".txt",".md",".html",".htm",".json"}
     if suffix not in allowed:raise HTTPException(415,f"Unsupported file type: {suffix or 'unknown'}")
-    original_name=file.filename or f"document{suffix}"
-    document_id=uuid4().hex
-    destination=UPLOAD_DIR/f"{document_id}{suffix}"
-    content_hash=hashlib.sha256()
-    total_bytes=0
+    original_name=file.filename or f"document{suffix}";document_id=uuid4().hex;destination=UPLOAD_DIR/f"{document_id}{suffix}"
+    content_hash=hashlib.sha256();total_bytes=0
     with destination.open("wb") as output:
         while chunk:=file.file.read(1024*1024):
             total_bytes+=len(chunk)
             if total_bytes>MAX_UPLOAD_BYTES:
-                destination.unlink(missing_ok=True)
-                raise HTTPException(413,f"File exceeds MAX_UPLOAD_MB={MAX_UPLOAD_BYTES//(1024*1024)}.")
+                destination.unlink(missing_ok=True);raise HTTPException(413,f"File exceeds MAX_UPLOAD_MB={MAX_UPLOAD_BYTES//(1024*1024)}.")
             content_hash.update(chunk);output.write(chunk)
     digest=content_hash.hexdigest()
     if any(d.content_hash==digest for d in documents.documents.values()):
         destination.unlink(missing_ok=True);raise HTTPException(409,"This document content already exists.")
     version=documents.next_version(original_name)
     try:
-        normalized=parse_document(destination)
-        chunks=semantic_chunks(normalized)
+        normalized=parse_document(destination);chunks=semantic_chunks(normalized)
         metadata=DocumentMetadata(document_id,original_name,version,"general",DocumentStatus.PENDING_REVIEW)
-        converted=[DocumentChunk(f"{document_id}-{i}",metadata,chunk.location.page,chunk.location.section,chunk.text) for i,chunk in enumerate(chunks)]
-        store.add(converted)
-        documents.add(ManagedDocument(document_id,original_name,version,digest,"general","PENDING_REVIEW",datetime.now(timezone.utc)))
+        converted=[DocumentChunk(f"{document_id}-{i}",metadata,c.location.page,c.location.section,c.text) for i,c in enumerate(chunks)]
+        store.add(converted);documents.add(ManagedDocument(document_id,original_name,version,digest,"general","PENDING_REVIEW",datetime.now(timezone.utc)))
         event=ops.audit("DOCUMENT_UPLOADED","system",document_id,{"filename":original_name,"version":version,"content_hash":digest,"chunks":len(converted)})
         return {"document_id":document_id,"filename":original_name,"format":normalized.document_type.value,"version":version,"chunks_indexed":len(converted),"status":"PENDING_REVIEW","message":"Document processed. An admin must approve it before students can use it.","audit_event_id":event.event_id}
     except Exception as exc:
@@ -226,17 +212,13 @@ async def upload_document(file:UploadFile=File(...)):
 async def tts(request:TTSRequest):
     try:lang=get_language(request.language)
     except ValueError:raise HTTPException(400,"Unsupported language") from None
-
-    selected_voice=request.voice_id
-    matching=[v for v in VOICES if v.voice_id==selected_voice]
+    matching=[v for v in VOICES if v.voice_id==request.voice_id]
     if not matching:raise HTTPException(400,"Unknown voice")
-    voice=matching[0]
+    voice=matching[0];selected_voice=voice.voice_id
     if voice.language!=lang.code:
         replacement=available_polly_voice(lang.code,voice.gender)
-        if replacement: selected_voice=replacement
-        elif not lang.polly_code:
-            raise HTTPException(503,"Cloud voice is not available for this language. Use browser voice output instead.")
-
+        if replacement:selected_voice=replacement
+        elif not lang.polly_code:raise HTTPException(503,"Cloud voice is not available for this language. Use browser voice output instead.")
     engine=os.getenv("POLLY_ENGINE","neural")
     cache_key=AmazonPollyProvider.cache_key(request.text,selected_voice,engine,lang.polly_code or lang.code)
     cached=tts_cache.get(cache_key)
