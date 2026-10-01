@@ -3,7 +3,7 @@ import shutil
 import time
 from uuid import uuid4
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from agents.orchestrator import CoachAIOrchestrator
 from knowledge.chunker import semantic_chunks
@@ -13,9 +13,9 @@ from rag.retrieval import HybridRetriever
 from rag.store import InMemoryKnowledgeStore
 from monitoring.metrics import metrics
 from monitoring.alerts import evaluate_alerts
-from voice.providers import VOICES
+from voice.providers import VOICES, AmazonPollyProvider
 
-app = FastAPI(title="CoachAI API", version="0.6.0")
+app = FastAPI(title="CoachAI API", version="0.7.0")
 store = InMemoryKnowledgeStore()
 orchestrator = CoachAIOrchestrator()
 UPLOAD_DIR = Path("data/documents")
@@ -24,6 +24,10 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
+
+class TTSRequest(BaseModel):
+    text: str
+    voice_id: str
 
 @app.get("/")
 async def home(): return FileResponse("web/index.html")
@@ -44,6 +48,17 @@ async def kpis():
 
 @app.get("/voices")
 async def voices(): return [v.__dict__ for v in VOICES]
+
+@app.post("/tts")
+async def tts(request: TTSRequest):
+    allowed = {v.voice_id for v in VOICES}
+    if request.voice_id not in allowed:
+        raise HTTPException(400, "Unknown voice")
+    try:
+        audio = AmazonPollyProvider().synthesize(request.text, request.voice_id)
+        return Response(content=audio, media_type="audio/mpeg")
+    except Exception as exc:
+        raise HTTPException(503, f"Voice service unavailable: {exc}") from exc
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
