@@ -13,3 +13,15 @@ variable "bedrock_model_id" { type = string default = "amazon.nova-micro-v1:0" }
 variable "bedrock_embedding_model_id" { type = string default = "amazon.titan-embed-text-v2:0" }
 variable "auth_mode" { type = string default = "api_gateway" }
 variable "certificate_arn" { type = string default = "" description = "ACM certificate ARN for production HTTPS." }
+
+variable "monthly_budget_usd" {
+  type        = number
+  default     = 50
+  description = "Optional monthly AWS spend alert threshold."
+}
+
+variable "budget_alert_email" {
+  type        = string
+  default     = ""
+  description = "Optional email for AWS Budget notifications. Leave empty to disable."
+}
