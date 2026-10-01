@@ -2,11 +2,11 @@
 
 ## Automated evidence
 
-- [ ] Unit suite passes with `pytest -q -m "not integration"`.
-- [ ] Deterministic quality gate passes with `python -m evaluation.ci_gate`.
-- [ ] PostgreSQL/Redis integration suite passes with `pytest -m integration -q`.
-- [ ] Compile/static smoke test passes.
-- [ ] Package build passes.
+- [x] Unit suite passes with `pytest -q -m "not integration"`.
+- [x] Deterministic quality gate passes with `python -m evaluation.ci_gate`.
+- [x] PostgreSQL/Redis integration suite passes with `pytest -m integration -q`.
+- [x] Compile/static smoke test passes.
+- [x] Package build passes.
 
 ## AWS evidence
 
@@ -30,7 +30,7 @@
 
 Record the commit SHA, CI workflow URL, test totals, skipped tests, quality-gate output, production smoke-test date, representative latency, estimated cost per 1,000 chats, and any known limitations.
 
-Do not label the deployment production-ready until the evidence above has actually been collected.
+The automated gates above are verified by GitHub Actions. Keep the AWS, identity and operational checks unchecked until they are run in the target account.
 ## Verified automated gates
 
 AI Quality Gate: https://github.com/varunpothu/ChatBot_Agent/actions/runs/36912758911
