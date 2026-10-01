@@ -5,9 +5,11 @@
 ### Conversation, multilingual UX and cost
 - Human-style response modes: friendly, professional and concise
 - Language selector with Auto-detect
-- Major Indian and international text languages
+- Localized greeting, abstention, human-review and security messages
+- English, Hindi, Telugu, Tamil, Bengali, Marathi, Gujarati, Punjabi, Urdu, Kannada, Malayalam, Spanish, French, German, Arabic, Italian, Portuguese, Japanese and Simplified Chinese text support
 - Deterministic script detection for major Indic, Arabic-derived, Japanese and Chinese scripts
-- Translation bridge for English-source knowledge bases
+- Native cross-language retrieval option using a local multilingual embedding model
+- Translation bridge for English-source knowledge bases as a fallback
 - Verified-answer translation, not direct unverified translation
 - Fast deterministic path for simple factual lookups
 - One-call deep path only for synthesis/explanation questions
@@ -20,6 +22,7 @@
 - Browser speech input/output as the default low-cost voice path
 - Optional cached Amazon Polly TTS
 - Runtime LLM, translation, voice, token and latency telemetry
+- Multilingual retrieval benchmark command for real-corpus evaluation
 
 ### Knowledge and safety
 - PDF, DOCX, PPTX, XLS/XLSX, CSV, TXT, Markdown, HTML and JSON ingestion
@@ -38,6 +41,7 @@
 - Bedrock Nova Micro adapter for low-cost synthesis
 - Bedrock Titan Text Embeddings V2 adapter with configurable dimensions
 - AWS Translate adapter for multilingual retrieval/answer translation
+- Optional local multilingual E5 embeddings
 - Groq adapter remains optional
 - AWS Polly adapter
 - AWS Transcribe boundary
@@ -57,7 +61,6 @@
 9. Larger golden evaluation suite covering retrieval, citations, faithfulness, multilingual translation quality, adversarial inputs, latency and cost.
 10. Terraform/IaC, deployment pipelines, CloudWatch SLOs and operational runbooks.
 11. Dynamic provider capability discovery for cloud voice selection.
-12. Multilingual embedding benchmark to decide when translation-based retrieval can be replaced by direct multilingual retrieval.
 
 ## Scale target
 
