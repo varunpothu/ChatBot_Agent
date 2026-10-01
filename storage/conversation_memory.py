@@ -28,7 +28,7 @@ class PostgresConversationMemory:
             "and ", "what about", "how about", "does that", "is that",
             "what if", "then ", "also ", "how much is that", "when is that",
         )
-        return any(text_value.startswith(x) for x in starters) or len(text_value.split()) <= 5
+        return any(text_value.startswith(x) for x in starters)
 
     def resolve(self, conversation_id: str | None, message: str) -> str:
         if not conversation_id or not self._looks_like_follow_up(message):
