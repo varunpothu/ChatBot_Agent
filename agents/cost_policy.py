@@ -5,6 +5,7 @@ from typing import Literal
 
 AnswerMode = Literal["fast", "deep"]
 
+
 @dataclass(frozen=True)
 class CostPolicy:
     max_input_chars: int = 1400
@@ -29,13 +30,14 @@ class CostPolicy:
             low_score_threshold=float(os.getenv("LOW_RETRIEVAL_SCORE", "0.18")),
         )
 
+
 def classify_answer_mode(message: str, policy: CostPolicy) -> AnswerMode:
     text = re.sub(r"\s+", " ", message.strip().lower())
     words = text.split()
     deep_signals = (
         "compare", "difference", "why", "explain", "summarise", "summarize",
         "step by step", "recommend", "which one", "how does", "pros and cons",
-        "multiple", "options", "scenario", "example"
+        "multiple", "options", "scenario", "example",
     )
     if len(words) > policy.deep_word_limit:
         return "deep"
@@ -45,18 +47,33 @@ def classify_answer_mode(message: str, policy: CostPolicy) -> AnswerMode:
         return "deep"
     return "fast"
 
+
 def trim_evidence(evidence: list[str], max_chars: int) -> list[str]:
+    budget = max(0, int(max_chars))
     selected: list[str] = []
     total = 0
+
     for item in evidence:
         clean = re.sub(r"\s+", " ", item).strip()
-        if not clean:
+        if not clean or total >= budget:
             continue
-        remaining = max_chars - total
-        if remaining <= 0:
+
+        remaining = budget - total
+        if len(clean) <= remaining:
+            selected.append(clean)
+            total += len(clean)
+            continue
+
+        if remaining <= 1:
+            selected.append(clean[:remaining])
             break
-        if len(clean) > remaining:
-            clean = clean[:remaining].rsplit(" ", 1)[0] + "…"
-        selected.append(clean)
-        total += len(clean)
+
+        trimmed = clean[:remaining - 1].rstrip()
+        if not trimmed:
+            selected.append(clean[:remaining])
+            break
+
+        selected.append(trimmed + "…")
+        break
+
     return selected
