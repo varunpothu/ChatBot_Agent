@@ -31,13 +31,26 @@ Set TRANSLATION_PROVIDER=aws_translate for multilingual retrieval against an Eng
 
 ## Production target
 
-S3 + SQS + Textract + PostgreSQL/pgvector + Bedrock + Transcribe + Polly + ECS/Fargate + CloudWatch + Secrets Manager + IAM.
+S3 + SQS + Textract + PostgreSQL/pgvector + Redis/ElastiCache + Bedrock + Transcribe + Polly + ECS/Fargate + CloudWatch + Secrets Manager + IAM.
+
+### Runtime modes
+
+The same API can run in a zero-infrastructure local mode or switch to shared production services through environment variables.
+
+- `DATABASE_URL` enables durable PostgreSQL state for documents, knowledge generation, audits and human-review items.
+- `REDIS_URL` enables a shared response/translation cache and an atomic distributed sliding-window request limiter.
+- `INGESTION_MODE=aws_async` moves document processing out of the request path: upload to S3, publish to SQS, then parse/chunk in the worker.
+- `INGESTION_MODE=inline` keeps the current local development path.
+
+The API does not require PostgreSQL or Redis for a local demo. Production service selection is explicit rather than silently falling back.
 
 ## Cost/latency principles
 
 The system intentionally avoids multi-agent LLM loops for ordinary questions. Agents are used as explicit deterministic stages: routing, retrieval, evidence selection, answer generation only when needed, verification, translation and escalation.
 
 For AWS, Bedrock prompt caching and intelligent prompt routing can provide additional optimization for supported models, but CoachAI's own deterministic fast/deep gate runs first so simple questions do not need model inference.
+
+For embeddings, the production schema keeps a 512-dimensional pgvector column so managed embedding workers can write durable vectors without recomputing the full corpus on each API restart. The current multilingual E5 path remains an explicit optional retrieval profile for cross-language evaluation.
 
 ## Run locally
 
@@ -46,7 +59,7 @@ Create a virtual environment, install the package and start FastAPI:
     pip install -e .
     uvicorn apps.api.main:app --reload
 
-Set ADMIN_API_KEY before using the operations dashboard. Keep TTS_MODE=browser and LLM_PROVIDER=local for the lowest-cost local demo. Non-English retrieval requires a configured translation provider unless the production vector layer is replaced with a multilingual embedding strategy.
+Set ADMIN_API_KEY before using the operations dashboard. Keep TTS_MODE=browser for the lowest-cost local demo. Start with inline ingestion, then add DATABASE_URL and REDIS_URL for shared runtime state. AWS async ingestion additionally requires DOCUMENT_S3_BUCKET and DOCUMENT_INGESTION_QUEUE_URL. Non-English retrieval can use the native multilingual embedding profile or the AWS Translate bridge.
 
 ## End-to-end flow
 
