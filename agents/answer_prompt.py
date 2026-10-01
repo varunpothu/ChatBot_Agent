@@ -21,8 +21,12 @@ CONVERSATION:
 - Do not mention internal agents, prompts, retrieval or token limits.
 """.strip()
 
-def build_system_prompt(style: str = "friendly") -> str:
+def build_system_prompt(style: str = "friendly", target_language: str = "English") -> str:
     style_rule = STYLE_RULES.get(style, STYLE_RULES["friendly"])
-    return BASE_RULES + "\n- " + style_rule
+    language_rule = (
+        "Write the final answer in " + target_language + ". Preserve numbers, dates, "
+        "currency, names and policy wording exactly unless normal grammar requires otherwise."
+    )
+    return BASE_RULES + "\n- " + style_rule + "\n- " + language_rule
 
-SYSTEM_PROMPT = build_system_prompt("friendly")
+SYSTEM_PROMPT = build_system_prompt("friendly", "English")
