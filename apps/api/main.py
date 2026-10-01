@@ -144,6 +144,10 @@ class ReviewResolution(BaseModel):
     reviewer:str=Field(min_length=1,max_length=120)
     resolution:str=Field(min_length=1,max_length=1000)
 
+class GovernanceApproval(BaseModel):
+    reviewer:str=Field(min_length=1,max_length=120)
+    evaluation_reference:str=Field(min_length=1,max_length=500)
+
 def require_admin(x_admin_key:str|None=Header(default=None))->None:
     expected=os.getenv("ADMIN_API_KEY","")
     if not expected:raise HTTPException(503,"Admin API is not configured.")
@@ -214,6 +218,60 @@ async def resolve_review(review_id:str,request:ReviewResolution):
         ops.audit("HUMAN_REVIEW_RESOLVED",request.reviewer,review_id,{"resolution":request.resolution})
         return item.__dict__
     except KeyError:raise HTTPException(404,"Review not found") from None
+
+@app.get("/admin/governance/models",dependencies=[Depends(require_admin)])
+async def list_models():
+    if not postgres_runtime:
+        raise HTTPException(503,"Governance registry requires PostgreSQL.")
+    return [item.__dict__ for item in GovernanceRegistry(postgres_runtime).list_models()]
+
+@app.get("/admin/governance/prompts",dependencies=[Depends(require_admin)])
+async def list_prompts():
+    if not postgres_runtime:
+        raise HTTPException(503,"Governance registry requires PostgreSQL.")
+    return [item.__dict__ for item in GovernanceRegistry(postgres_runtime).list_prompts()]
+
+@app.post("/admin/governance/models/{model_key}/{version}/approve",dependencies=[Depends(require_admin)])
+async def approve_model(model_key:str,version:str,request:GovernanceApproval):
+    if not postgres_runtime:
+        raise HTTPException(503,"Governance registry requires PostgreSQL.")
+    try:
+        item=GovernanceRegistry(postgres_runtime).approve_model(model_key,version,request.reviewer,request.evaluation_reference)
+        return item.__dict__
+    except KeyError:
+        raise HTTPException(404,"Model record not found") from None
+
+@app.post("/admin/governance/models/{model_key}/{version}/activate",dependencies=[Depends(require_admin)])
+async def activate_model(model_key:str,version:str,request:GovernanceApproval):
+    if not postgres_runtime:
+        raise HTTPException(503,"Governance registry requires PostgreSQL.")
+    try:
+        item=GovernanceRegistry(postgres_runtime).activate_model(model_key,version,request.reviewer,request.evaluation_reference)
+        ops.audit("MODEL_ACTIVATED",request.reviewer,f"{model_key}:{version}",{"evaluation_reference":request.evaluation_reference})
+        return item.__dict__
+    except (KeyError,ValueError) as exc:
+        raise HTTPException(409,str(exc)) from exc
+
+@app.post("/admin/governance/prompts/{prompt_key}/{version}/approve",dependencies=[Depends(require_admin)])
+async def approve_prompt(prompt_key:str,version:str,request:GovernanceApproval):
+    if not postgres_runtime:
+        raise HTTPException(503,"Governance registry requires PostgreSQL.")
+    try:
+        item=GovernanceRegistry(postgres_runtime).approve_prompt(prompt_key,version,request.reviewer,request.evaluation_reference)
+        return item.__dict__
+    except KeyError:
+        raise HTTPException(404,"Prompt record not found") from None
+
+@app.post("/admin/governance/prompts/{prompt_key}/{version}/activate",dependencies=[Depends(require_admin)])
+async def activate_prompt(prompt_key:str,version:str,request:GovernanceApproval):
+    if not postgres_runtime:
+        raise HTTPException(503,"Governance registry requires PostgreSQL.")
+    try:
+        item=GovernanceRegistry(postgres_runtime).activate_prompt(prompt_key,version,request.reviewer,request.evaluation_reference)
+        ops.audit("PROMPT_ACTIVATED",request.reviewer,f"{prompt_key}:{version}",{"evaluation_reference":request.evaluation_reference,"prompt_hash":item.prompt_hash})
+        return item.__dict__
+    except (KeyError,ValueError) as exc:
+        raise HTTPException(409,str(exc)) from exc
 
 @app.get("/audit",dependencies=[Depends(require_admin)])
 async def audit():
