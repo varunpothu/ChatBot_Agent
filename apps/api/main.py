@@ -24,7 +24,7 @@ from monitoring.metrics import metrics
 from monitoring.alerts import evaluate_alerts
 from ops.runtime import ops
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
-from rag.managed_embeddings import build_bedrock_embedding_provider
+from rag.managed_embeddings import CachedEmbeddingProvider, build_bedrock_embedding_provider
 from rag.retrieval import HybridRetriever, PostgresHybridRetriever
 from rag.store import InMemoryKnowledgeStore
 from security.rate_limit import SlidingWindowLimiter
@@ -55,6 +55,7 @@ else:
 retriever:HybridRetriever|PostgresHybridRetriever|None=None
 retriever_generation=-1
 shared_query_embedding_cache=None
+shared_document_embedding_cache=None
 INGESTION_MODE=os.getenv("INGESTION_MODE","inline").lower()
 
 def build_cloud_model():
@@ -72,7 +73,8 @@ REDIS_URL=os.getenv("REDIS_URL","").strip()
 if REDIS_URL:
     shared_cache=RedisTTLCache(REDIS_URL,ttl_seconds=int(os.getenv("RESPONSE_CACHE_TTL_SECONDS","300")),namespace="coachai:responses")
     shared_translation_cache=RedisTTLCache(REDIS_URL,ttl_seconds=max(int(os.getenv("RESPONSE_CACHE_TTL_SECONDS","300")),600),namespace="coachai:translations")
-    shared_query_embedding_cache=RedisTTLCache(REDIS_URL,ttl_seconds=int(os.getenv("EMBEDDING_CACHE_TTL_SECONDS","900")),namespace="coachai:embeddings")
+    shared_query_embedding_cache=RedisTTLCache(REDIS_URL,ttl_seconds=int(os.getenv("EMBEDDING_CACHE_TTL_SECONDS","900")),namespace="coachai:query-embeddings")
+    shared_document_embedding_cache=RedisTTLCache(REDIS_URL,ttl_seconds=int(os.getenv("EMBEDDING_CACHE_TTL_SECONDS","900")),namespace="coachai:document-embeddings")
     rate_limiter=RedisSlidingWindowLimiter(REDIS_URL,int(os.getenv("MAX_REQUESTS_PER_MINUTE","30")),60)
 else:
     shared_cache=None
@@ -257,7 +259,7 @@ async def upload_document(file:UploadFile=File(...)):
 
         normalized=parse_document(destination);chunks=semantic_chunks(normalized)
         metadata=DocumentMetadata(document_id,original_name,version,"general",DocumentStatus.PENDING_REVIEW)
-        vectors=build_bedrock_embedding_provider().embed([item.text for item in chunks]) if RUNTIME_BACKEND=="postgres" else [[] for _ in chunks]
+        vectors=CachedEmbeddingProvider(build_bedrock_embedding_provider(),cache=shared_document_embedding_cache).embed([item.text for item in chunks]) if RUNTIME_BACKEND=="postgres" else [[] for _ in chunks]
         converted=[DocumentChunk(f"{document_id}-{i}",metadata,c.location.page,c.location.section,c.text,embedding=vectors[i]) for i,c in enumerate(chunks)]
         documents.add(ManagedDocument(document_id,original_name,version,digest,"general","PENDING_REVIEW",datetime.now(timezone.utc)))
         store.add(converted)
