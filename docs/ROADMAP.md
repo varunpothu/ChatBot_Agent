@@ -44,9 +44,9 @@
 - Optional local multilingual E5 embeddings
 - Groq adapter remains optional
 - AWS Polly adapter
-- AWS Transcribe boundary
-- PostgreSQL/pgvector production schema
-- S3/SQS/Textract/ECS/CloudWatch/Secrets Manager/IAM target architecture
+- Amazon Transcribe streaming adapter with optional server-side /stt endpoint
+- PostgreSQL/pgvector durable runtime and database-native hybrid retrieval
+- S3/SQS/Textract/Transcribe/ECS/CloudWatch/Secrets Manager/IAM production service boundaries
 
 ## Integrated production foundations
 
@@ -59,13 +59,11 @@
 
 ## Still to integrate for a full production deployment
 
-1. AWS Textract for scanned/image documents and managed embedding workers.
-2. Amazon Transcribe streaming adapter for server-side voice.
-3. OIDC/IAM/API Gateway authentication instead of the development admin-key mechanism.
-4. Full model/prompt registry persistence and approval workflow.
-5. Larger golden evaluation suite covering retrieval, citations, faithfulness, multilingual translation quality, adversarial inputs, latency and cost.
-6. Terraform/IaC, deployment pipelines, CloudWatch SLOs and operational runbooks.
-7. Dynamic provider capability discovery for cloud voice selection.
+1. OIDC/IAM/API Gateway authentication instead of the development admin-key mechanism.
+2. Full model/prompt registry persistence and approval workflow.
+3. Larger golden evaluation suite covering retrieval, citations, faithfulness, multilingual translation quality, adversarial inputs, latency and cost.
+4. Terraform/IaC, deployment pipelines, CloudWatch SLOs and operational runbooks.
+5. Dynamic provider capability discovery for cloud voice selection.
 
 ## Scale target
 
