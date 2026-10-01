@@ -18,6 +18,7 @@ class Metrics:
     estimated_output_tokens: int = 0
     translation_characters: int = 0
     tts_characters: int = 0
+    stt_calls: int = 0
     total_latency_ms: float = 0
 
     def record(self,event:str,latency_ms:float=0,**usage):
@@ -38,6 +39,7 @@ class Metrics:
         self.estimated_output_tokens+=int(usage.get("output_tokens",0))
         self.translation_characters+=int(usage.get("translation_characters",0))
         self.tts_characters+=int(usage.get("tts_characters",0))
+        if event=="stt":self.stt_calls+=1
 
     def snapshot(self):
         return {
@@ -51,7 +53,7 @@ class Metrics:
             "llm_calls":self.llm_calls,"llm_call_rate":round(self.llm_calls/self.requests,4) if self.requests else 0,
             "translation_calls":self.translation_calls,"translation_characters":self.translation_characters,
             "estimated_input_tokens":self.estimated_input_tokens,"estimated_output_tokens":self.estimated_output_tokens,
-            "tts_characters":self.tts_characters,
+            "tts_characters":self.tts_characters,"stt_calls":self.stt_calls,
             "average_latency_ms":round(self.total_latency_ms/self.requests,2) if self.requests else 0,
             "grounded_answer_rate":round(self.successful_answers/self.requests,4) if self.requests else 0,
             "abstention_rate":round(self.abstentions/self.requests,4) if self.requests else 0,
