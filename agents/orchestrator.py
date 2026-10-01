@@ -1,5 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass, field
+import re
 from typing import Any
 
 from agents.budget import CloudBudget
@@ -118,9 +119,10 @@ class CoachAIOrchestrator:
             memory.remember(conversation_id, resolved_message, route.intent)
             return result
 
+        display_answer = re.sub(r"\\s*\\[S\\d+\\]", "", answer).strip()
         result = {
             "conversation_id": conversation_id,
-            "answer": answer,
+            "answer": display_answer,
             "intent": route.intent,
             "citations": [Citation.from_result(r).__dict__ for r in results],
             "verification": verification.__dict__,
