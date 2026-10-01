@@ -33,7 +33,6 @@ resource "aws_ecs_task_definition" "api" {
     environment = [
       { name = "APP_ENV", value = "production" },
       { name = "AWS_REGION", value = var.aws_region },
-      { name = "DATABASE_URL", value = "" },
       { name = "INGESTION_MODE", value = "aws_async" },
       { name = "DOCUMENT_S3_BUCKET", value = aws_s3_bucket.documents.bucket },
       { name = "DOCUMENT_INGESTION_QUEUE_URL", value = aws_sqs_queue.ingestion.id },
