@@ -9,6 +9,9 @@ async function loadLanguages(){
     const o=document.createElement("option");o.value=x.code;o.textContent=x.code==="auto"?x.name:(x.name+" • "+x.native_name);language.appendChild(o)
   });
   language.value=prefs.language||"auto";
+  window.__coachaiLanguages=list;
+  const selected=list.find(x=>x.code===language.value)||list[0];
+  add(selected.greeting,"assistant");
 }
 loadLanguages().catch(()=>{language.innerHTML="<option value='auto'>Auto-detect</option>"});
 if(prefs.voice)voice.value=prefs.voice;
@@ -16,7 +19,7 @@ if(prefs.style)style.value=prefs.style;
 if(typeof prefs.autoSpeak==="boolean")autoSpeak.checked=prefs.autoSpeak;
 
 function savePrefs(){localStorage.setItem(PREF_KEY,JSON.stringify({language:language.value,voice:voice.value,style:style.value,autoSpeak:autoSpeak.checked}))}
-voice.onchange=savePrefs;style.onchange=savePrefs;language.onchange=savePrefs;autoSpeak.onchange=savePrefs;
+voice.onchange=savePrefs;style.onchange=savePrefs;language.onchange=()=>{savePrefs();const selected=(window.__coachaiLanguages||[]).find(x=>x.code===language.value);if(selected)add(selected.greeting,"assistant")};autoSpeak.onchange=savePrefs;
 
 function browserSpeak(text){
   if(!("speechSynthesis" in window))return false;
@@ -51,7 +54,6 @@ function add(text,kind,citations=[]){
 }
 
 let lastLanguage="en-GB";
-add("Hi! Ask me anything about the coaching centre. I’ll check the approved information first and answer in the language you choose.","assistant");
 
 form.addEventListener("submit",async e=>{
   e.preventDefault();const message=input.value.trim();if(!message)return;
