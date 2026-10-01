@@ -2,8 +2,8 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
-from agents.answer_prompt import build_system_prompt
 from agents.cache import TTLCache
+from agents.conversation import memory
 from agents.cost_policy import CostPolicy, trim_evidence
 from agents.model import AnswerModel, ExtractiveAnswerModel
 from agents.response import humanize_deep_answer, humanize_factual_answer
@@ -32,8 +32,10 @@ class CoachAIOrchestrator:
         voice_id: str = "Brian",
     ) -> dict[str, Any]:
         message = " ".join(message.split())[: self.policy.max_input_chars]
+        resolved_message = memory.resolve(conversation_id, message)
+
         if looks_like_prompt_injection(message):
-            return {
+            result = {
                 "conversation_id": conversation_id,
                 "answer": "I can help with coaching-centre information, but I can't follow requests to reveal or change my internal instructions.",
                 "intent": "security",
@@ -42,10 +44,12 @@ class CoachAIOrchestrator:
                 "next_action": "human_review",
                 "voice": {"voice_id": voice_id, "style": style},
             }
+            memory.remember(conversation_id, message, "security")
+            return result
 
-        route = route_query(message, self.policy)
+        route = route_query(resolved_message, self.policy)
         if route.requires_human_review:
-            return {
+            result = {
                 "conversation_id": conversation_id,
                 "answer": "I can help, but this needs a member of the coaching-centre team. I’ll keep this as a human-review case.",
                 "intent": route.intent,
@@ -53,41 +57,44 @@ class CoachAIOrchestrator:
                 "next_action": "human_review",
                 "voice": {"voice_id": voice_id, "style": style},
             }
+            memory.remember(conversation_id, resolved_message, route.intent)
+            return result
 
-        if not route.requires_retrieval:
-            return self._abstain(conversation_id, route.intent, "This request requires a human.")
         if self.retriever is None:
             return self._abstain(conversation_id, route.intent, "Knowledge base is not configured.")
 
-        cache_key = self.cache.key(message.lower(), style, str(self.knowledge_generation))
+        cache_key = self.cache.key(resolved_message.lower(), style, str(self.knowledge_generation))
         cached = self.cache.get(cache_key)
         if cached is not None:
             cached = deepcopy(cached)
             cached["conversation_id"] = conversation_id
             cached["voice"] = {"voice_id": voice_id, "style": style}
             cached["performance"]["cache_hit"] = True
+            memory.remember(conversation_id, resolved_message, route.intent)
             return cached
 
-        results = self.retriever.search(message, top_k=self.policy.retrieval_top_k)
+        results = self.retriever.search(resolved_message, top_k=self.policy.retrieval_top_k)
         if not results or results[0].final_score < self.policy.low_score_threshold:
-            return self._abstain(conversation_id, route.intent, "No sufficiently strong approved evidence was found.")
+            result = self._abstain(conversation_id, route.intent, "No sufficiently strong approved evidence was found.")
+            memory.remember(conversation_id, resolved_message, route.intent)
+            return result
 
         evidence = trim_evidence([r.chunk.text for r in results], self.policy.max_evidence_chars)
         use_llm = route.answer_mode == "deep" and self.answer_model is not None and self.policy.llm_enabled
         model = self.answer_model if use_llm else ExtractiveAnswerModel()
 
-        draft = await model.generate(message, evidence, style)
+        draft = await model.generate(resolved_message, evidence, style)
         if draft.strip().upper() == "ABSTAIN":
-            return self._abstain(conversation_id, route.intent, "The model could not produce an evidence-grounded answer.")
+            result = self._abstain(conversation_id, route.intent, "The model could not produce an evidence-grounded answer.")
+            memory.remember(conversation_id, resolved_message, route.intent)
+            return result
 
-        answer = (
-            humanize_deep_answer(draft, style)
-            if use_llm
-            else humanize_factual_answer(draft, style)
-        )
+        answer = humanize_deep_answer(draft, style) if use_llm else humanize_factual_answer(draft, style)
         verification = verify_claims(answer, evidence)
         if not verification.grounded:
-            return self._abstain(conversation_id, route.intent, "Answer failed grounding verification.")
+            result = self._abstain(conversation_id, route.intent, "Answer failed grounding verification.")
+            memory.remember(conversation_id, resolved_message, route.intent)
+            return result
 
         result = {
             "conversation_id": conversation_id,
@@ -103,12 +110,13 @@ class CoachAIOrchestrator:
                 "cache_hit": False,
                 "llm_called": use_llm,
                 "evidence_chunks": len(evidence),
-                "input_chars": len(message),
+                "input_chars": len(resolved_message),
                 "evidence_chars": sum(len(x) for x in evidence),
                 "max_output_tokens": self.policy.max_output_tokens,
             },
         }
         self.cache.set(cache_key, result)
+        memory.remember(conversation_id, resolved_message, route.intent)
         return result
 
     @staticmethod
