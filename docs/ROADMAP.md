@@ -2,8 +2,13 @@
 
 ## Implemented now
 
-### Conversation and cost
+### Conversation, multilingual UX and cost
 - Human-style response modes: friendly, professional and concise
+- Language selector with Auto-detect
+- Major Indian and international text languages
+- Deterministic script detection for major Indic, Arabic-derived, Japanese and Chinese scripts
+- Translation bridge for English-source knowledge bases
+- Verified-answer translation, not direct unverified translation
 - Fast deterministic path for simple factual lookups
 - One-call deep path only for synthesis/explanation questions
 - Adaptive evidence selection
@@ -14,7 +19,7 @@
 - Local request rate limiting
 - Browser speech input/output as the default low-cost voice path
 - Optional cached Amazon Polly TTS
-- Runtime cost, token and latency telemetry
+- Runtime LLM, translation, voice, token and latency telemetry
 
 ### Knowledge and safety
 - PDF, DOCX, PPTX, XLS/XLSX, CSV, TXT, Markdown, HTML and JSON ingestion
@@ -32,6 +37,7 @@
 ### AI and AWS provider boundaries
 - Bedrock Nova Micro adapter for low-cost synthesis
 - Bedrock Titan Text Embeddings V2 adapter with configurable dimensions
+- AWS Translate adapter for multilingual retrieval/answer translation
 - Groq adapter remains optional
 - AWS Polly adapter
 - AWS Transcribe boundary
@@ -48,13 +54,15 @@
 6. Amazon Transcribe streaming adapter for server-side voice.
 7. OIDC/IAM/API Gateway authentication instead of the development admin-key mechanism.
 8. Full model/prompt registry persistence and approval workflow.
-9. Larger golden evaluation suite covering retrieval, citations, faithfulness, adversarial inputs, latency and cost.
+9. Larger golden evaluation suite covering retrieval, citations, faithfulness, multilingual translation quality, adversarial inputs, latency and cost.
 10. Terraform/IaC, deployment pipelines, CloudWatch SLOs and operational runbooks.
+11. Dynamic provider capability discovery for cloud voice selection.
+12. Multilingual embedding benchmark to decide when translation-based retrieval can be replaced by direct multilingual retrieval.
 
 ## Scale target
 
 The architecture is intentionally designed so higher traffic does not automatically mean higher model usage. The preferred scaling path is:
 
-more users -> more cached/local retrieval -> more shared infrastructure -> only proportionally more deep model calls.
+more users -> more cache/local retrieval -> more shared infrastructure -> only proportionally more deep model calls.
 
-Do not optimize for “smallest model at any cost.” Optimize for the cheapest architecture that passes the required quality and safety gates.
+Do not optimize for the smallest model at any cost. Optimize for the cheapest architecture that passes the required quality, multilingual, safety and latency gates.
