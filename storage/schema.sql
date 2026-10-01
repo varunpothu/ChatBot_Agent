@@ -90,3 +90,37 @@ CREATE TABLE IF NOT EXISTS human_review_queue (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     resolved_at TIMESTAMPTZ
 );
+
+CREATE TABLE IF NOT EXISTS model_registry (
+    model_key TEXT NOT NULL,
+    version TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('DRAFT','PENDING_REVIEW','APPROVED','ACTIVE','REJECTED','ARCHIVED')),
+    configuration JSONB NOT NULL DEFAULT '{}'::jsonb,
+    owner TEXT,
+    approved_by TEXT,
+    approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (model_key, version)
+);
+
+CREATE INDEX IF NOT EXISTS idx_model_registry_active
+    ON model_registry(model_key, status);
+
+CREATE TABLE IF NOT EXISTS prompt_registry (
+    prompt_key TEXT NOT NULL,
+    version TEXT NOT NULL,
+    prompt_hash TEXT NOT NULL,
+    template TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('DRAFT','PENDING_REVIEW','APPROVED','ACTIVE','REJECTED','ARCHIVED')),
+    owner TEXT,
+    approved_by TEXT,
+    approved_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (prompt_key, version),
+    UNIQUE(prompt_key, prompt_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_registry_active
+    ON prompt_registry(prompt_key, status);
