@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS model_registry (
     owner TEXT,
     approved_by TEXT,
     approved_at TIMESTAMPTZ,
+    evaluation_reference TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (model_key, version)
 );
@@ -117,6 +118,7 @@ CREATE TABLE IF NOT EXISTS prompt_registry (
     owner TEXT,
     approved_by TEXT,
     approved_at TIMESTAMPTZ,
+    evaluation_reference TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (prompt_key, version),
     UNIQUE(prompt_key, prompt_hash)
@@ -124,3 +126,6 @@ CREATE TABLE IF NOT EXISTS prompt_registry (
 
 CREATE INDEX IF NOT EXISTS idx_prompt_registry_active
     ON prompt_registry(prompt_key, status);
+
+ALTER TABLE model_registry ADD COLUMN IF NOT EXISTS evaluation_reference TEXT;
+ALTER TABLE prompt_registry ADD COLUMN IF NOT EXISTS evaluation_reference TEXT;
