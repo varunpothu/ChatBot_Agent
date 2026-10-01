@@ -143,7 +143,7 @@ class GovernanceRegistry:
             row = conn.execute(
                 text(
                     "SELECT prompt_key, version, prompt_hash, template, status, owner, "
-                    "approved_by, approved_at, created_at "
+                    "approved_by, approved_at, evaluation_reference, created_at "
                     "FROM prompt_registry WHERE prompt_key=:prompt_key AND version=:version"
                 ),
                 {"prompt_key": prompt_key, "version": version},
@@ -223,7 +223,7 @@ class GovernanceRegistry:
                     "UPDATE prompt_registry SET status='ACTIVE', approved_by=:reviewer, approved_at=COALESCE(approved_at, now()), evaluation_reference=:evaluation_reference "
                     "WHERE prompt_key=:prompt_key AND version=:version"
                 ),
-                {"prompt_key": prompt_key, "version": version, "reviewer": reviewer},
+                {"prompt_key": prompt_key, "version": version, "reviewer": reviewer, "evaluation_reference": evaluation_reference},
             )
         return self.get_prompt(prompt_key, version)
 
@@ -267,7 +267,7 @@ class GovernanceRegistry:
                     "UPDATE model_registry SET status='ACTIVE', approved_by=:reviewer, approved_at=COALESCE(approved_at, now()), evaluation_reference=:evaluation_reference "
                     "WHERE model_key=:model_key AND version=:version"
                 ),
-                {"model_key": model_key, "version": version, "reviewer": reviewer},
+                {"model_key": model_key, "version": version, "reviewer": reviewer, "evaluation_reference": evaluation_reference},
             )
         return self.get_model(model_key, version)
 
@@ -275,7 +275,7 @@ class GovernanceRegistry:
         with self.engine.connect() as conn:
             row = conn.execute(
                 text(
-                    "SELECT prompt_key, version, prompt_hash, template, status, owner, approved_by, approved_at, created_at "
+                    "SELECT prompt_key, version, prompt_hash, template, status, owner, approved_by, approved_at, evaluation_reference, created_at "
                     "FROM prompt_registry WHERE prompt_key=:prompt_key AND status='ACTIVE' "
                     "ORDER BY created_at DESC LIMIT 1"
                 ),
@@ -297,7 +297,7 @@ class GovernanceRegistry:
             row = conn.execute(
                 text(
                     "SELECT model_key, version, provider, model_name, status, configuration, owner, "
-                    "approved_by, approved_at, created_at FROM model_registry "
+                    "approved_by, approved_at, evaluation_reference, created_at FROM model_registry "
                     "WHERE model_key=:model_key AND status='ACTIVE' ORDER BY created_at DESC LIMIT 1"
                 ),
                 {"model_key": model_key},
