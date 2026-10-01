@@ -2,12 +2,21 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 import json
+from uuid import UUID, uuid5, NAMESPACE_URL
 
 from sqlalchemy import create_engine, text
 
 from knowledge.document_registry import ManagedDocument
 from ops.runtime import AuditEvent, HumanReviewItem
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
+
+
+def _db_uuid(value: str) -> str:
+    """Normalize compact application IDs into canonical PostgreSQL UUID text."""
+    try:
+        return str(UUID(value))
+    except ValueError:
+        return str(uuid5(NAMESPACE_URL, value))
 
 
 class PostgresRuntime:
@@ -74,7 +83,7 @@ class PostgresKnowledgeStore:
         if not new_chunks:
             return
         with self.engine.begin() as conn:
-            for chunk in new_chunks:
+            for index, chunk in enumerate(new_chunks):
                 embedding = (
                     "[" + ",".join(str(float(x)) for x in chunk.embedding) + "]"
                     if chunk.embedding
@@ -88,9 +97,9 @@ class PostgresKnowledgeStore:
                         "CASE WHEN :embedding IS NULL THEN NULL ELSE CAST(:embedding AS vector) END)"
                     ),
                     {
-                        "chunk_id": chunk.chunk_id,
-                        "document_id": chunk.document.document_id,
-                        "chunk_index": new_chunks.index(chunk),
+                        "chunk_id": _db_uuid(chunk.chunk_id),
+                        "document_id": _db_uuid(chunk.document.document_id),
+                        "chunk_index": index,
                         "content": chunk.text,
                         "page": chunk.page,
                         "section": chunk.section,
@@ -106,7 +115,7 @@ class PostgresKnowledgeStore:
                     "UPDATE documents SET status = :status "
                     "WHERE document_id = CAST(:document_id AS uuid)"
                 ),
-                {"document_id": document_id, "status": status.value},
+                {"document_id": _db_uuid(document_id), "status": status.value},
             )
             if result.rowcount:
                 self._bump_generation(conn)
@@ -201,7 +210,7 @@ class PostgresDocumentRegistry:
                     "created_at, approved_by, source_uri "
                     "FROM documents WHERE document_id = CAST(:document_id AS uuid)"
                 ),
-                {"document_id": document_id},
+                {"document_id": _db_uuid(document_id)},
             ).mappings().first()
         if row is None:
             raise KeyError("Document not found")
@@ -277,7 +286,7 @@ class PostgresDocumentRegistry:
                     "UPDATE documents SET status = 'ACTIVE', approved_by = :approved_by "
                     "WHERE document_id = CAST(:document_id AS uuid)"
                 ),
-                {"document_id": document_id, "approved_by": approved_by},
+                {"document_id": _db_uuid(document_id), "approved_by": approved_by},
             )
             conn.execute(
                 text(
@@ -287,6 +296,19 @@ class PostgresDocumentRegistry:
             )
             return [str(item) for item in archived]
 
+    def set_status(self, document_id: str, status: str) -> None:
+        with self.engine.begin() as conn:
+            result = conn.execute(
+                text(
+                    "UPDATE documents SET status = :status "
+                    "WHERE document_id = CAST(:document_id AS uuid)"
+                ),
+                {"document_id": _db_uuid(document_id), "status": status},
+            )
+            if not result.rowcount:
+                raise KeyError("Document not found")
+            self._bump_generation(conn)
+
     def reject(self, document_id: str, reviewer: str) -> None:
         with self.engine.begin() as conn:
             result = conn.execute(
@@ -294,7 +316,7 @@ class PostgresDocumentRegistry:
                     "UPDATE documents SET status = 'REJECTED', approved_by = :reviewer "
                     "WHERE document_id = CAST(:document_id AS uuid) AND status = 'PENDING_REVIEW'"
                 ),
-                {"document_id": document_id, "reviewer": reviewer},
+                {"document_id": _db_uuid(document_id), "reviewer": reviewer},
             )
             if not result.rowcount:
                 raise ValueError("Only pending-review documents can be rejected")
@@ -397,7 +419,7 @@ class PostgresRuntimeOps:
                     "WHERE review_id=CAST(:review_id AS uuid) "
                     "RETURNING review_id, reason, message, conversation_id, status, created_at, resolved_by, resolution"
                 ),
-                {"review_id": review_id, "reviewer": reviewer, "resolution": resolution},
+                {"review_id": _db_uuid(review_id), "reviewer": reviewer, "resolution": resolution},
             ).mappings().first()
             if row is None:
                 raise KeyError("Review not found")
