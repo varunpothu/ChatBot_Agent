@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     content TEXT NOT NULL,
     page INTEGER,
     section TEXT,
-    embedding vector(384),
+    embedding vector(512),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
