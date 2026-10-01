@@ -16,33 +16,38 @@ resource "aws_s3_bucket" "documents" {
 }
 
 resource "aws_s3_bucket_public_access_block" "documents" {
-  bucket = aws_s3_bucket.documents.id
-  block_public_acls = true
-  block_public_policy = true
-  ignore_public_acls = true
+  bucket                 = aws_s3_bucket.documents.id
+  block_public_acls     = true
+  block_public_policy   = true
+  ignore_public_acls    = true
   restrict_public_buckets = true
 }
 
 resource "aws_s3_bucket_versioning" "documents" {
   bucket = aws_s3_bucket.documents.id
-  versioning_configuration { status = "Enabled" }
+
+  versioning_configuration {
+    status = "Enabled"
+  }
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "documents" {
   bucket = aws_s3_bucket.documents.id
 
   rule {
-    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
   }
 }
 
 resource "aws_sqs_queue" "ingestion_dlq" {
-  name = "${var.project_name}-ingestion-dlq"
+  name                       = "${var.project_name}-ingestion-dlq"
   message_retention_seconds = 1209600
 }
 
 resource "aws_sqs_queue" "ingestion" {
-  name = "${var.project_name}-ingestion"
+  name                       = "${var.project_name}-ingestion"
   visibility_timeout_seconds = 300
 
   redrive_policy = jsonencode({
@@ -57,10 +62,9 @@ resource "aws_ecr_lifecycle_policy" "app" {
   policy = jsonencode({
     rules = [{
       rulePriority = 1
-      description  = "Keep the newest 10 immutable deployment images"
+      description  = "Keep the newest 10 deployment images"
       selection = {
-        tagStatus   = "tagged"
-        tagPrefixList = []
+        tagStatus   = "any"
         countType   = "imageCountMoreThan"
         countNumber = 10
       }
