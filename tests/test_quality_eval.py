@@ -35,8 +35,8 @@ def test_golden_retrieval_covers_distinct_policy_facts():
     retriever = HybridRetriever(make_chunks())
     cases = [
         TestCase("How much is the Data Science course?", ("£2800",)),
-        TestCase("How long do I have to request a refund?", ("14 days",)),
-        TestCase("What time does the evening batch start?", ("6pm",)),
+        EvalCase("How long do I have to request a refund?", ("14 days",)),
+        EvalCase("What time does the evening batch start?", ("6pm",)),
     ]
     result = run_retrieval_tests(retriever, cases, top_k=3)
     assert result["recall_at_k"] == 1.0
