@@ -32,7 +32,7 @@ class AWSIngestionPublisher:
         self.s3 = boto3.client("s3", region_name=session_region)
         self.sqs = boto3.client("sqs", region_name=session_region)
 
-    def publish_file(
+    def upload_file(
         self,
         path: str | Path,
         *,
@@ -49,7 +49,17 @@ class AWSIngestionPublisher:
             key,
             ExtraArgs={"Metadata": {"sha256": content_hash, "document-version": version}},
         )
-        source_uri = f"s3://{self.target.bucket}/{key}"
+        return f"s3://{self.target.bucket}/{key}"
+
+    def enqueue(
+        self,
+        *,
+        document_id: str,
+        filename: str,
+        version: str,
+        content_hash: str,
+        source_uri: str,
+    ) -> None:
         message = {
             "event": "coachai.document.ingest",
             "document_id": document_id,
@@ -62,4 +72,16 @@ class AWSIngestionPublisher:
             QueueUrl=self.target.queue_url,
             MessageBody=json.dumps(message, separators=(",", ":")),
         )
+
+    def publish_file(
+        self,
+        path: str | Path,
+        *,
+        document_id: str,
+        filename: str,
+        version: str,
+        content_hash: str,
+    ) -> str:
+        source_uri=self.upload_file(path,document_id=document_id,filename=filename,version=version,content_hash=content_hash)
+        self.enqueue(document_id=document_id,filename=filename,version=version,content_hash=content_hash,source_uri=source_uri)
         return source_uri
