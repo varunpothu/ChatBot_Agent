@@ -6,10 +6,8 @@ import os
 import tempfile
 
 from knowledge.chunker import semantic_chunks
-from knowledge.document_registry import ManagedDocument
 from knowledge.parsers import parse_document
-from ops.runtime import RuntimeOps
-from rag.models import DocumentChunk, DocumentStatus
+from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
 from storage.postgres import PostgresRuntime
 
 
@@ -41,7 +39,7 @@ class IngestionWorker:
             normalized = parse_document(destination)
             chunks = semantic_chunks(normalized)
             metadata = self.documents.get(document_id)
-            document_metadata = __import__("rag.models", fromlist=["DocumentMetadata"]).DocumentMetadata(
+            document_metadata = DocumentMetadata(
                 document_id=document_id,
                 name=metadata.name,
                 version=metadata.version,
