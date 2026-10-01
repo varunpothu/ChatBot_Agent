@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "coachai-rag"
-version = "0.3.0"
-description = "Grounded RAG coaching-centre assistant with multi-format ingestion, evaluation, monitoring and voice"
+version = "1.0.0"
+description = "Production-oriented, low-cost grounded RAG coaching-centre assistant with governed ingestion, multi-format retrieval, voice, evaluation and human oversight"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi>=0.115,<1",
