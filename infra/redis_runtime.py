@@ -36,14 +36,20 @@ class RedisTTLCache:
         return f"{self.namespace}:cache:{key}"
 
     def get(self, key: str) -> Any | None:
-        raw = self.client.get(self._redis_key(key))
-        if raw is None:
+        try:
+            raw = self.client.get(self._redis_key(key))
+            if raw is None:
+                return None
+            return json.loads(raw)
+        except Exception:
             return None
-        return json.loads(raw)
 
     def set(self, key: str, value: Any) -> None:
-        payload = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
-        self.client.setex(self._redis_key(key), self.ttl_seconds, payload)
+        try:
+            payload = json.dumps(value, separators=(",", ":"), ensure_ascii=False)
+            self.client.setex(self._redis_key(key), self.ttl_seconds, payload)
+        except Exception:
+            return
 
 
 class RedisSlidingWindowLimiter:
