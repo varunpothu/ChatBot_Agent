@@ -22,6 +22,7 @@ class ModelRecord:
     owner: str | None
     approved_by: str | None
     approved_at: str | None
+    evaluation_reference: str | None
     created_at: str
 
 
@@ -35,6 +36,7 @@ class PromptRecord:
     owner: str | None
     approved_by: str | None
     approved_at: str | None
+    evaluation_reference: str | None
     created_at: str
 
 
@@ -61,15 +63,16 @@ class GovernanceRegistry:
         model_name: str,
         configuration: dict | None = None,
         owner: str | None = None,
+        evaluation_reference: str | None = None,
     ) -> ModelRecord:
         created_at = datetime.now(timezone.utc)
         with self.engine.begin() as conn:
             conn.execute(
                 text(
                     "INSERT INTO model_registry "
-                    "(model_key, version, provider, model_name, status, configuration, owner, created_at) "
+                    "(model_key, version, provider, model_name, status, configuration, owner, evaluation_reference, created_at) "
                     "VALUES (:model_key, :version, :provider, :model_name, 'PENDING_REVIEW', "
-                    "CAST(:configuration AS jsonb), :owner, :created_at) "
+                    "CAST(:configuration AS jsonb), :owner, :evaluation_reference, :created_at) "
                     "ON CONFLICT (model_key, version) DO NOTHING"
                 ),
                 {
@@ -79,6 +82,7 @@ class GovernanceRegistry:
                     "model_name": model_name,
                     "configuration": json.dumps(configuration or {}),
                     "owner": owner,
+                    "evaluation_reference": evaluation_reference,
                     "created_at": created_at,
                 },
             )
@@ -90,6 +94,7 @@ class GovernanceRegistry:
         version: str,
         template: str,
         owner: str | None = None,
+        evaluation_reference: str | None = None,
     ) -> PromptRecord:
         created_at = datetime.now(timezone.utc)
         digest = self.prompt_hash(template)
@@ -97,8 +102,8 @@ class GovernanceRegistry:
             conn.execute(
                 text(
                     "INSERT INTO prompt_registry "
-                    "(prompt_key, version, prompt_hash, template, status, owner, created_at) "
-                    "VALUES (:prompt_key, :version, :prompt_hash, :template, 'PENDING_REVIEW', :owner, :created_at) "
+                    "(prompt_key, version, prompt_hash, template, status, owner, evaluation_reference, created_at) "
+                    "VALUES (:prompt_key, :version, :prompt_hash, :template, 'PENDING_REVIEW', :owner, :evaluation_reference, :created_at) "
                     "ON CONFLICT (prompt_key, version) DO NOTHING"
                 ),
                 {
@@ -107,6 +112,7 @@ class GovernanceRegistry:
                     "prompt_hash": digest,
                     "template": template,
                     "owner": owner,
+                    "evaluation_reference": evaluation_reference,
                     "created_at": created_at,
                 },
             )
@@ -117,7 +123,7 @@ class GovernanceRegistry:
             row = conn.execute(
                 text(
                     "SELECT model_key, version, provider, model_name, status, configuration, "
-                    "owner, approved_by, approved_at, created_at "
+                    "owner, approved_by, approved_at, evaluation_reference, created_at "
                     "FROM model_registry WHERE model_key=:model_key AND version=:version"
                 ),
                 {"model_key": model_key, "version": version},
@@ -128,6 +134,7 @@ class GovernanceRegistry:
             row["model_key"], row["version"], row["provider"], row["model_name"],
             row["status"], row["configuration"] or {}, row["owner"], row["approved_by"],
             row["approved_at"].isoformat() if row["approved_at"] else None,
+            row["evaluation_reference"],
             row["created_at"].isoformat(),
         )
 
@@ -147,6 +154,7 @@ class GovernanceRegistry:
             row["prompt_key"], row["version"], row["prompt_hash"], row["template"],
             row["status"], row["owner"], row["approved_by"],
             row["approved_at"].isoformat() if row["approved_at"] else None,
+            row["evaluation_reference"],
             row["created_at"].isoformat(),
         )
 
@@ -164,7 +172,7 @@ class GovernanceRegistry:
             ).all()
         return [self.get_prompt(str(key), str(version)) for key, version in rows]
 
-    def approve_prompt(self, prompt_key: str, version: str, reviewer: str) -> PromptRecord:
+    def approve_prompt(self, prompt_key: str, version: str, reviewer: str, evaluation_reference: str | None = None) -> PromptRecord:
         with self.engine.begin() as conn:
             row = conn.execute(
                 text(
@@ -179,13 +187,14 @@ class GovernanceRegistry:
             conn.execute(
                 text(
                     "UPDATE prompt_registry SET status='APPROVED', approved_by=:reviewer, "
-                    "approved_at=now() WHERE prompt_key=:prompt_key AND version=:version"
+                    "approved_at=now(), evaluation_reference=COALESCE(:evaluation_reference, evaluation_reference) "
+                    "WHERE prompt_key=:prompt_key AND version=:version"
                 ),
-                {"prompt_key": prompt_key, "version": version, "reviewer": reviewer},
+                {"prompt_key": prompt_key, "version": version, "reviewer": reviewer, "evaluation_reference": evaluation_reference},
             )
         return self.get_prompt(prompt_key, version)
 
-    def activate_prompt(self, prompt_key: str, version: str, reviewer: str) -> PromptRecord:
+    def activate_prompt(self, prompt_key: str, version: str, reviewer: str, evaluation_reference: str | None = None) -> PromptRecord:
         with self.engine.begin() as conn:
             target = conn.execute(
                 text(
@@ -196,6 +205,11 @@ class GovernanceRegistry:
             ).mappings().first()
             if target is None or target["status"] not in {"APPROVED", "ACTIVE"}:
                 raise ValueError("Prompt must be approved before activation")
+            if evaluation_reference is None:
+                existing = conn.execute(text("SELECT evaluation_reference FROM prompt_registry WHERE prompt_key=:prompt_key AND version=:version"), {"prompt_key": prompt_key, "version": version}).scalar_one_or_none()
+                evaluation_reference = existing
+            if not evaluation_reference:
+                raise ValueError("Prompt activation requires an evaluation reference")
 
             conn.execute(
                 text(
@@ -206,27 +220,27 @@ class GovernanceRegistry:
             )
             conn.execute(
                 text(
-                    "UPDATE prompt_registry SET status='ACTIVE', approved_by=:reviewer, approved_at=COALESCE(approved_at, now()) "
+                    "UPDATE prompt_registry SET status='ACTIVE', approved_by=:reviewer, approved_at=COALESCE(approved_at, now()), evaluation_reference=:evaluation_reference "
                     "WHERE prompt_key=:prompt_key AND version=:version"
                 ),
                 {"prompt_key": prompt_key, "version": version, "reviewer": reviewer},
             )
         return self.get_prompt(prompt_key, version)
 
-    def approve_model(self, model_key: str, version: str, reviewer: str) -> ModelRecord:
+    def approve_model(self, model_key: str, version: str, reviewer: str, evaluation_reference: str | None = None) -> ModelRecord:
         with self.engine.begin() as conn:
             result = conn.execute(
                 text(
-                    "UPDATE model_registry SET status='APPROVED', approved_by=:reviewer, approved_at=now() "
+                    "UPDATE model_registry SET status='APPROVED', approved_by=:reviewer, approved_at=now(), evaluation_reference=COALESCE(:evaluation_reference, evaluation_reference) "
                     "WHERE model_key=:model_key AND version=:version AND status IN ('PENDING_REVIEW','APPROVED')"
                 ),
-                {"model_key": model_key, "version": version, "reviewer": reviewer},
+                {"model_key": model_key, "version": version, "reviewer": reviewer, "evaluation_reference": evaluation_reference},
             )
             if not result.rowcount:
                 raise KeyError("Model is not pending review")
         return self.get_model(model_key, version)
 
-    def activate_model(self, model_key: str, version: str, reviewer: str) -> ModelRecord:
+    def activate_model(self, model_key: str, version: str, reviewer: str, evaluation_reference: str | None = None) -> ModelRecord:
         with self.engine.begin() as conn:
             target = conn.execute(
                 text(
@@ -236,6 +250,10 @@ class GovernanceRegistry:
             ).mappings().first()
             if target is None or target["status"] not in {"APPROVED", "ACTIVE"}:
                 raise ValueError("Model must be approved before activation")
+            if evaluation_reference is None:
+                evaluation_reference = conn.execute(text("SELECT evaluation_reference FROM model_registry WHERE model_key=:model_key AND version=:version"), {"model_key": model_key, "version": version}).scalar_one_or_none()
+            if not evaluation_reference:
+                raise ValueError("Model activation requires an evaluation reference")
 
             conn.execute(
                 text(
@@ -246,7 +264,7 @@ class GovernanceRegistry:
             )
             conn.execute(
                 text(
-                    "UPDATE model_registry SET status='ACTIVE', approved_by=:reviewer, approved_at=COALESCE(approved_at, now()) "
+                    "UPDATE model_registry SET status='ACTIVE', approved_by=:reviewer, approved_at=COALESCE(approved_at, now()), evaluation_reference=:evaluation_reference "
                     "WHERE model_key=:model_key AND version=:version"
                 ),
                 {"model_key": model_key, "version": version, "reviewer": reviewer},
