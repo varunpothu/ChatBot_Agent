@@ -1,5 +1,15 @@
 CREATE EXTENSION IF NOT EXISTS vector;
 
+CREATE TABLE IF NOT EXISTS knowledge_state (
+    state_id INTEGER PRIMARY KEY CHECK (state_id = 1),
+    generation BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO knowledge_state (state_id, generation)
+VALUES (1, 0)
+ON CONFLICT (state_id) DO NOTHING;
+
 CREATE TABLE IF NOT EXISTS documents (
     document_id UUID PRIMARY KEY,
     name TEXT NOT NULL,
