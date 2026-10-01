@@ -54,6 +54,13 @@ CREATE TABLE IF NOT EXISTS conversations (
     last_intent TEXT
 );
 
+CREATE TABLE IF NOT EXISTS conversation_state (
+    conversation_id UUID PRIMARY KEY REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    last_query TEXT NOT NULL,
+    last_intent TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS conversation_turns (
     turn_id UUID PRIMARY KEY,
     conversation_id UUID NOT NULL REFERENCES conversations(conversation_id),
