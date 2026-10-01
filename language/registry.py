@@ -42,6 +42,10 @@ def get_language(code: str) -> Language:
         raise ValueError(f"Unsupported language: {code}") from None
 
 def detect_script_language(text: str) -> str:
+    if any(c in text for c in "々ぁあぃいぅうぇえぉおかがきぎくぐけげこごさざしじすずせぜそただちぢつづてでとど"):
+        return "ja-JP"
+    if any("\u4E00" <= c <= "\u9FFF" for c in text):
+        return "zh-CN"
     counts={
         "hi-IN":sum("\u0900"<=c<="\u097F" for c in text),
         "bn-IN":sum("\u0980"<=c<="\u09FF" for c in text),
@@ -51,12 +55,10 @@ def detect_script_language(text: str) -> str:
         "te-IN":sum("\u0C00"<=c<="\u0C7F" for c in text),
         "kn-IN":sum("\u0C80"<=c<="\u0CFF" for c in text),
         "ml-IN":sum("\u0D00"<=c<="\u0D7F" for c in text),
-        "ur-PK":sum("\u0600"<=c<="\u06FF" for c in text),
-        "ar-SA":sum("\u0600"<=c<="\u06FF" for c in text),
+        "arabic-script":sum("\u0600"<=c<="\u06FF" for c in text),
     }
     best=max(counts,key=counts.get)
-    # Arabic-script text is ambiguous between Arabic and Urdu; explicit
-    # selection is therefore preferred for those languages.
-    if best in {"ur-PK","ar-SA"}:
-        return best
+    if best=="arabic-script" and counts[best]>=2:
+        urdu_specific=sum(c in "ٹڈڑںےھہ" for c in text)
+        return "ur-PK" if urdu_specific else "ar-SA"
     return best if counts[best]>=2 else "en-GB"
