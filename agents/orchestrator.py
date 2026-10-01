@@ -11,6 +11,7 @@ from agents.model import AnswerModel, ExtractiveAnswerModel
 from agents.response import humanize_deep_answer, humanize_factual_answer
 from agents.router import route_query
 from agents.verification import verify_claims
+from language.messages import message as localized_message
 from language.registry import detect_script_language, get_language
 from rag.citations import Citation
 from rag.retrieval import HybridRetriever
@@ -60,12 +61,12 @@ class CoachAIOrchestrator:
         voice_meta={"voice_id":voice_id,"style":style,"language":target.code,"language_name":target.name}
 
         if looks_like_prompt_injection(message):
-            result={"conversation_id":conversation_id,"answer":"I can help with coaching-centre information, but I can't follow requests to reveal or change my internal instructions.","intent":"security","abstained":True,"security_blocked":True,"next_action":"human_review","voice":voice_meta,"language":target.code}
+            result={"conversation_id":conversation_id,"answer":localized_message("security",target.code),"intent":"security","abstained":True,"security_blocked":True,"next_action":"human_review","voice":voice_meta,"language":target.code}
             memory.remember(conversation_id,message,"security");return result
 
         route=route_query(resolved_message,self.policy)
         if route.requires_human_review:
-            result={"conversation_id":conversation_id,"answer":"I can help, but this needs a member of the coaching-centre team. I’ll keep this as a human-review case.","intent":route.intent,"abstained":False,"next_action":"human_review","voice":voice_meta,"language":target.code}
+            result={"conversation_id":conversation_id,"answer":localized_message("human",target.code),"intent":route.intent,"abstained":False,"next_action":"human_review","voice":voice_meta,"language":target.code}
             memory.remember(conversation_id,resolved_message,route.intent);return result
         if self.retriever is None:
             return self._abstain(conversation_id,route.intent,"Knowledge base is not configured.",voice_meta)
@@ -146,4 +147,4 @@ class CoachAIOrchestrator:
 
     @staticmethod
     def _abstain(conversation_id,intent,reason,voice_meta):
-        return {"conversation_id":conversation_id,"answer":"I couldn't verify that in the approved coaching-centre documents, so I don't want to guess. A team member can help with this.","intent":intent,"abstained":True,"reason":reason,"next_action":"human_review","voice":voice_meta,"language":voice_meta.get("language")}
+        return {"conversation_id":conversation_id,"answer":localized_message("abstain",voice_meta.get("language","en-GB")),"intent":intent,"abstained":True,"reason":reason,"next_action":"human_review","voice":voice_meta,"language":voice_meta.get("language")}
