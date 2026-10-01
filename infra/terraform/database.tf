@@ -26,6 +26,7 @@ resource "aws_db_instance" "main" {
   backup_retention_period     = 7
   deletion_protection         = true
   skip_final_snapshot         = false
+  final_snapshot_identifier   = "${var.project_name}-final"
   copy_tags_to_snapshot       = true
 }
 
