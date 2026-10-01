@@ -20,7 +20,6 @@ from language.registry import get_language
 from knowledge.chunker import semantic_chunks
 from knowledge.document_registry import ManagedDocument, documents
 from knowledge.parsers import parse_document
-from knowledge.document_types import DocumentType, detect_type
 from monitoring.metrics import metrics
 from monitoring.alerts import evaluate_alerts
 from ops.runtime import ops
@@ -29,6 +28,7 @@ from rag.managed_embeddings import CachedEmbeddingProvider, build_bedrock_embedd
 from rag.retrieval import HybridRetriever, PostgresHybridRetriever
 from rag.store import InMemoryKnowledgeStore
 from security.rate_limit import SlidingWindowLimiter
+from security.auth import require_principal
 from translation.service import TranslationService
 from voice.language_voices import available_polly_voice, language_capabilities
 from voice.providers import VOICES, AmazonPollyProvider
@@ -198,6 +198,7 @@ def get_retriever()->HybridRetriever|PostgresHybridRetriever:
 
 @app.post("/chat")
 async def chat(request:Request,payload:ChatRequest):
+    principal=require_principal(request)
     started=time.perf_counter()
     client_key=request.client.host if request.client else "unknown"
     if not rate_limiter.allow(client_key):
@@ -226,10 +227,11 @@ async def chat(request:Request,payload:ChatRequest):
         item=ops.enqueue_review(result.get("reason",result.get("intent","human_review")),payload.message,conversation_id);review_id=item.review_id
         metrics.record("human_escalation");ops.audit("HUMAN_REVIEW_CREATED","system",review_id,{"intent":result.get("intent")})
     result["conversation_id"]=conversation_id
+    result["principal"]={"user_id":principal.user_id,"role":principal.role}
     if review_id:result["review_id"]=review_id
     return result
 
-@app.post("/documents/upload")
+@app.post("/documents/upload",dependencies=[Depends(require_admin)])
 async def upload_document(file:UploadFile=File(...)):
     suffix=Path(file.filename or "").suffix.lower();allowed={".pdf",".docx",".pptx",".xlsx",".xls",".csv",".txt",".md",".html",".htm",".json",".png",".jpg",".jpeg",".webp",".tiff"}
     if suffix not in allowed:raise HTTPException(415,f"Unsupported file type: {suffix or 'unknown'}")
