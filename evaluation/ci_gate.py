@@ -22,16 +22,19 @@ def main() -> int:
         TestCase("What is the Data Science course fee?", ("£2800",)),
         TestCase("What do applicants need?", ("application", "photo ID")),
         TestCase("When does the evening batch start?", ("6pm", "weekdays")),
+        TestCase("How long do I have to request a refund?", ("14 days",)),
     ]
     retrieval = run_retrieval_tests(retriever, cases, top_k=3)
     result = asyncio.run(CoachAIOrchestrator(retriever=retriever).run("What is the Data Science course fee?"))
+    abstention_result = asyncio.run(CoachAIOrchestrator(retriever=retriever).run("What is the weather on Mars?"))
     citation_accuracy = 1.0 if result.get("citations") and result["verification"]["grounded"] else 0.0
+    abstention_ok = bool(abstention_result.get("abstained"))
     gate = evaluate_release(
-        {"verification_failures": 0, "average_latency_ms": 0},
+        {"verification_failures": 0, "average_latency_ms": 0, "abstention_check": abstention_ok},
         retrieval["recall_at_k"],
         citation_accuracy,
     )
-    print({"retrieval": retrieval, "release_gate": gate.__dict__})
+    print({"retrieval": retrieval, "citation_accuracy": citation_accuracy, "abstention_ok": abstention_ok, "release_gate": gate.__dict__})
     if not gate.passed:
         print("AI QUALITY GATE FAILED:", "; ".join(gate.reasons), file=sys.stderr)
         return 1
