@@ -25,14 +25,16 @@ class CoachAIOrchestrator:
     translator:TranslationService|None=None
     policy:CostPolicy=field(default_factory=CostPolicy.from_env)
     cloud_budget:CloudBudget=field(default_factory=lambda:CloudBudget())
-    cache:TTLCache=field(init=False)
-    translation_cache:TTLCache=field(init=False)
+    cache:Any|None=None
+    translation_cache:Any|None=None
     knowledge_generation:int=0
     source_language:str="en"
 
     def __post_init__(self):
-        self.cache=TTLCache(ttl_seconds=self.policy.cache_ttl_seconds)
-        self.translation_cache=TTLCache(ttl_seconds=max(self.policy.cache_ttl_seconds,600))
+        if self.cache is None:
+            self.cache=TTLCache(ttl_seconds=self.policy.cache_ttl_seconds)
+        if self.translation_cache is None:
+            self.translation_cache=TTLCache(ttl_seconds=max(self.policy.cache_ttl_seconds,600))
 
     @staticmethod
     def _adaptive_results(results):
