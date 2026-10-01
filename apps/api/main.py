@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from agents.bedrock_model import BedrockAnswerModel
+from agents.cache import TTLCache
 from agents.groq_model import GroqAnswerModel
 from agents.orchestrator import CoachAIOrchestrator
 from knowledge.chunker import semantic_chunks
@@ -20,8 +21,10 @@ from monitoring.metrics import metrics
 from monitoring.alerts import evaluate_alerts
 from voice.providers import VOICES, AmazonPollyProvider
 
-app = FastAPI(title="CoachAI API", version="0.8.0")
+app = FastAPI(title="CoachAI API", version="0.9.0")
 store = InMemoryKnowledgeStore()
+retriever: HybridRetriever | None = None
+retriever_generation = -1
 
 def build_cloud_model():
     provider = os.getenv("LLM_PROVIDER", "auto").lower()
@@ -52,7 +55,7 @@ def build_cloud_model():
 orchestrator = CoachAIOrchestrator(answer_model=build_cloud_model())
 UPLOAD_DIR = Path(os.getenv("DOCUMENT_STORAGE_PATH", "data/documents"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-tts_cache: dict[str, bytes] = {}
+tts_cache = TTLCache(ttl_seconds=int(os.getenv("TTS_CACHE_TTL_SECONDS", "3600")), max_items=256)
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=1400)
@@ -70,8 +73,22 @@ async def home(): return FileResponse("web/index.html")
 @app.get("/dashboard")
 async def dashboard(): return FileResponse("web/dashboard.html")
 
+@app.get("/config")
+async def config():
+    return {
+        "tts_mode": os.getenv("TTS_MODE", "browser"),
+        "llm_provider": os.getenv("LLM_PROVIDER", "auto"),
+        "fast_path_default": True,
+    }
+
 @app.get("/health")
-async def health(): return {"status": "ok", "service": "coachai-api", "generation": store.generation}
+async def health():
+    return {
+        "status": "ok",
+        "service": "coachai-api",
+        "generation": store.generation,
+        "retriever_ready": retriever is not None and retriever_generation == store.generation,
+    }
 
 @app.get("/kpis")
 async def kpis():
@@ -80,6 +97,13 @@ async def kpis():
 
 @app.get("/voices")
 async def voices(): return [v.__dict__ for v in VOICES]
+
+def get_retriever() -> HybridRetriever:
+    global retriever, retriever_generation
+    if retriever is None or retriever_generation != store.generation:
+        retriever = HybridRetriever(store.all())
+        retriever_generation = store.generation
+    return retriever
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
@@ -90,7 +114,7 @@ async def chat(request: ChatRequest):
     if request.conversation_style not in {"friendly", "professional", "concise"}:
         raise HTTPException(400, "Unsupported conversation style")
 
-    orchestrator.retriever = HybridRetriever(store.all())
+    orchestrator.retriever = get_retriever()
     orchestrator.knowledge_generation = store.generation
     result = await orchestrator.run(
         request.message,
@@ -103,7 +127,12 @@ async def chat(request: ChatRequest):
     if result.get("performance", {}).get("cache_hit"):
         metrics.record("cache_hit", elapsed)
     elif result.get("performance", {}).get("llm_called"):
-        metrics.record("llm_call", elapsed, input_tokens=len(request.message)//4, output_tokens=len(result.get("answer", ""))//4)
+        metrics.record(
+            "llm_call",
+            elapsed,
+            input_tokens=len(request.message)//4,
+            output_tokens=len(result.get("answer", ""))//4,
+        )
     else:
         metrics.record("fast_path", elapsed)
 
@@ -123,10 +152,12 @@ async def upload_document(file: UploadFile = File(...)):
     allowed = {".pdf",".docx",".pptx",".xlsx",".xls",".csv",".txt",".md",".html",".htm",".json"}
     if suffix not in allowed:
         raise HTTPException(415, f"Unsupported file type: {suffix or 'unknown'}")
+
     document_id = uuid4().hex
     destination = UPLOAD_DIR / f"{document_id}{suffix}"
     with destination.open("wb") as output:
         shutil.copyfileobj(file.file, output)
+
     try:
         normalized = parse_document(destination)
         chunks = semantic_chunks(normalized)
@@ -165,14 +196,18 @@ async def tts(request: TTSRequest):
     allowed = {v.voice_id for v in VOICES}
     if request.voice_id not in allowed:
         raise HTTPException(400, "Unknown voice")
-    cache_key = AmazonPollyProvider.cache_key(request.text, request.voice_id, os.getenv("POLLY_ENGINE", "neural"))
+
+    engine = os.getenv("POLLY_ENGINE", "neural")
+    cache_key = AmazonPollyProvider.cache_key(request.text, request.voice_id, engine)
     cached = tts_cache.get(cache_key)
     if cached is not None:
         return Response(content=cached, media_type="audio/mpeg", headers={"X-TTS-Cache": "HIT"})
+
     try:
         audio = AmazonPollyProvider().synthesize(request.text, request.voice_id)
     except Exception as exc:
         raise HTTPException(503, f"Voice service unavailable: {exc}") from exc
-    tts_cache[cache_key] = audio
+
+    tts_cache.set(cache_key, audio)
     metrics.record("tts", tts_characters=len(request.text))
     return Response(content=audio, media_type="audio/mpeg", headers={"X-TTS-Cache": "MISS"})
