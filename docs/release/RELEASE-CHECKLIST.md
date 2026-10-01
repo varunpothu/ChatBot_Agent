@@ -33,8 +33,17 @@ Record the commit SHA, CI workflow URL, test totals, skipped tests, quality-gate
 The automated gates above are verified by GitHub Actions. Keep the AWS, identity and operational checks unchecked until they are run in the target account.
 ## Verified automated gates
 
-AI Quality Gate: https://github.com/varunpothu/ChatBot_Agent/actions/runs/36912758911
+AI Quality Gate: https://github.com/varunpothu/ChatBot_Agent/actions/runs/36913480280
 
-Commit: b9b2691df45d882e151daf584aafda3430bef72e
+Commit: d36c7c5a969bb5c84be5479ea4914c3a65447fb5
 
 Unit/quality, PostgreSQL/Redis integration, Terraform validation and package build all completed successfully.
+
+
+## Final automated evidence
+
+AI Quality Gate: https://github.com/varunpothu/ChatBot_Agent/actions/runs/36913480280
+
+Commit: d36c7c5a969bb5c84be5479ea4914c3a65447fb5
+
+56 unit tests passed, 4 integration tests passed, Terraform validation passed, package build passed, and the deterministic quality benchmark passed. AWS account-specific smoke tests remain deployment-specific.
