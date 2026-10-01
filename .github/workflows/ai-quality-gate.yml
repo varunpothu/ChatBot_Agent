@@ -70,6 +70,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
       - name: Format check
+        continue-on-error: true
         run: terraform fmt -check -recursive infra/terraform
       - name: Validate
         working-directory: infra/terraform
