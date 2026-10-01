@@ -94,7 +94,8 @@ class PostgresKnowledgeStore:
                         "INSERT INTO document_chunks "
                         "(chunk_id, document_id, chunk_index, content, page, section, embedding) "
                         "VALUES (:chunk_id, :document_id, :chunk_index, :content, :page, :section, "
-                        "CASE WHEN :embedding IS NULL THEN NULL ELSE CAST(:embedding AS vector) END)"
+                        "CASE WHEN :embedding IS NULL THEN NULL ELSE CAST(:embedding AS vector) END) "
+                        "ON CONFLICT (chunk_id) DO NOTHING"
                     ),
                     {
                         "chunk_id": _db_uuid(chunk.chunk_id),
