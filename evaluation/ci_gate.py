@@ -13,6 +13,7 @@ def build_fixture():
         DocumentChunk("fees-1", DocumentMetadata("fees", "Fees.pdf", "v1", "fees", "ACTIVE", date(2026, 1, 1)), 1, "Fees", "The Data Science course fee is £2800."),
         DocumentChunk("admissions-1", DocumentMetadata("admissions", "Admissions.pdf", "v2", "admissions", "ACTIVE", date(2026, 1, 1)), 2, "Admissions", "Applicants need a completed application form and photo ID."),
         DocumentChunk("schedule-1", DocumentMetadata("schedule", "Schedule.pdf", "v1", "schedule", "ACTIVE", date(2026, 1, 1)), 3, "Schedule", "The evening batch starts at 6pm on weekdays."),
+        DocumentChunk("refunds-1", DocumentMetadata("refunds", "Refunds.pdf", "v1", "refunds", "ACTIVE", date(2026, 1, 1)), 4, "Refunds", "Refund requests must be submitted within 14 days."),
     ]
 
 def main() -> int:
