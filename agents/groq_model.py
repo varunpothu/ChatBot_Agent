@@ -1,15 +1,10 @@
 import os
 import httpx
 
-from agents.answer_prompt import SYSTEM_PROMPT
+from agents.answer_prompt import build_system_prompt
 
 class GroqAnswerModel:
-    """Optional OpenAI-compatible Groq adapter.
-
-    The adapter is only enabled when GROQ_API_KEY is configured. Keeping the
-    provider behind the AnswerModel boundary lets the project swap to AWS
-    Bedrock or another provider without changing retrieval or verification.
-    """
+    """Optional cloud adapter used only for deep/synthesis questions."""
 
     def __init__(self, model: str | None = None):
         self.api_key = os.getenv("GROQ_API_KEY")
@@ -18,25 +13,29 @@ class GroqAnswerModel:
             raise RuntimeError("GROQ_API_KEY is not configured")
         if not self.model:
             raise RuntimeError("GROQ_MODEL is not configured")
-
-    async def generate(self, question: str, evidence: list[str]) -> str:
-        evidence_text = "\n\n".join(
-            f"[S{i}] {item}" for i, item in enumerate(evidence, start=1)
+        self.max_output_tokens = int(os.getenv("MAX_OUTPUT_TOKENS", "180"))
+        self.timeout_seconds = float(os.getenv("LLM_TIMEOUT_SECONDS", "8"))
+        self.client = httpx.AsyncClient(
+            timeout=httpx.Timeout(self.timeout_seconds, connect=2.0),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         )
+
+    async def generate(self, question: str, evidence: list[str], style: str = "friendly") -> str:
+        evidence_text = "\n".join(f"[S{i}] {item}" for i, item in enumerate(evidence, start=1))
         payload = {
             "model": self.model,
             "temperature": 0,
+            "max_tokens": self.max_output_tokens,
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT + "\n\n" + evidence_text},
-                {"role": "user", "content": question},
+                {"role": "system", "content": build_system_prompt(style)},
+                {"role": "user", "content": f"EVIDENCE:\n{evidence_text}\n\nQUESTION: {question}"},
             ],
         }
         headers = {"Authorization": f"Bearer {self.api_key}"}
-        async with httpx.AsyncClient(timeout=45) as client:
-            response = await client.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                json=payload,
-                headers=headers,
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"].strip()
+        response = await self.client.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            json=payload,
+            headers=headers,
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"].strip()
