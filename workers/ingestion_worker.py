@@ -10,6 +10,7 @@ import time
 from knowledge.chunker import semantic_chunks
 from knowledge.parsers import parse_document
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
+from rag.managed_embeddings import build_bedrock_embedding_provider
 from storage.postgres import PostgresRuntime
 
 
@@ -51,6 +52,8 @@ class IngestionWorker:
                 category=metadata.category,
                 status=DocumentStatus.PENDING_REVIEW,
             )
+            embedding_provider = build_bedrock_embedding_provider()
+            vectors = embedding_provider.embed([item.text for item in chunks])
             converted = [
                 DocumentChunk(
                     chunk_id=f"{document_id}-{i}",
@@ -58,6 +61,7 @@ class IngestionWorker:
                     page=item.location.page,
                     section=item.location.section,
                     text=item.text,
+                    embedding=vectors[i],
                 )
                 for i, item in enumerate(chunks)
             ]
