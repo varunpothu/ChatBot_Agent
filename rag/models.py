@@ -1,8 +1,15 @@
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Literal
+from enum import Enum
 
-DocumentStatus = Literal["DRAFT", "PROCESSING", "PENDING_REVIEW", "APPROVED", "ACTIVE", "ARCHIVED", "REJECTED"]
+class DocumentStatus(str, Enum):
+    DRAFT = "DRAFT"
+    PROCESSING = "PROCESSING"
+    PENDING_REVIEW = "PENDING_REVIEW"
+    APPROVED = "APPROVED"
+    ACTIVE = "ACTIVE"
+    ARCHIVED = "ARCHIVED"
+    REJECTED = "REJECTED"
 
 @dataclass(frozen=True)
 class DocumentMetadata:
