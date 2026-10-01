@@ -50,3 +50,23 @@ resource "aws_sqs_queue" "ingestion" {
     maxReceiveCount     = 5
   })
 }
+
+resource "aws_ecr_lifecycle_policy" "app" {
+  repository = aws_ecr_repository.app.name
+
+  policy = jsonencode({
+    rules = [{
+      rulePriority = 1
+      description  = "Keep the newest 10 immutable deployment images"
+      selection = {
+        tagStatus   = "tagged"
+        tagPrefixList = []
+        countType   = "imageCountMoreThan"
+        countNumber = 10
+      }
+      action = {
+        type = "expire"
+      }
+    }]
+  })
+}
