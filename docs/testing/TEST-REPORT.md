@@ -35,15 +35,16 @@ This report covers the automated tests and production-test scaffolding added to 
 ### Verified in this environment
 
 - GitHub repository files were inspected after each major implementation change.
-- The production workflow definition was updated to include unit, integration and packaging jobs.
-- The latest GitHub commit can be inspected in the repository history.
+- A real GitHub Actions run was observed for the repository; the initial production-quality run failed on setuptools package discovery and Terraform formatting.
+- Those CI failures were used to drive the package-discovery and Terraform-formatting fixes now committed.
+- The latest GitHub Actions runs after those fixes are being used as the next verification signal; a passing result is not claimed until the latest run concludes successfully.
 
 ### Not executed here
 
 - Local pytest execution could not be performed because the environment could not resolve github.com and the repository could not be cloned into the local runtime.
 - A real PostgreSQL/pgvector and Redis integration environment was not available in this runtime.
 - No AWS account or AWS credentials are available here, so S3, SQS, Textract, Bedrock, Transcribe and Polly smoke tests were not executed.
-- GitHub Actions has not produced a workflow run for the latest commits, so no remote passing result is claimed.
+- The latest CI run status is tracked from GitHub Actions. A passing result is not claimed unless the complete workflow concludes successfully.
 
 ## Required next verification
 
