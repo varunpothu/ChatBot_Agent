@@ -185,7 +185,7 @@ async def audit():
         return [e.__dict__ for e in ops.list_audit(200)]
     return [e.__dict__ for e in reversed(ops.audit_events[-200:])]
 
-def get_retriever()->HybridRetriever:
+def get_retriever()->HybridRetriever|PostgresHybridRetriever:
     global retriever,retriever_generation
     if retriever is None or retriever_generation!=store.generation:
         if RUNTIME_BACKEND=="postgres":
