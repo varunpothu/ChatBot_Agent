@@ -6,11 +6,12 @@ import time
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from agents.bedrock_model import BedrockAnswerModel
+from agents.budget import CloudBudget
 from agents.cache import TTLCache
 from agents.groq_model import GroqAnswerModel
 from agents.orchestrator import CoachAIOrchestrator
@@ -23,40 +24,42 @@ from rag.store import InMemoryKnowledgeStore
 from monitoring.metrics import metrics
 from monitoring.alerts import evaluate_alerts
 from ops.runtime import ops
+from security.rate_limit import SlidingWindowLimiter
 from voice.providers import VOICES, AmazonPollyProvider
 
-app = FastAPI(title="CoachAI API", version="1.1.0")
+app = FastAPI(title="CoachAI API", version="1.2.0")
 store = InMemoryKnowledgeStore()
 retriever: HybridRetriever | None = None
 retriever_generation = -1
 
 def build_cloud_model():
+    if os.getenv("LLM_ENABLED", "true").lower() != "true":
+        return None
     provider = os.getenv("LLM_PROVIDER", "auto").lower()
     if provider == "local":
         return None
     if provider == "bedrock":
-        try:
-            return BedrockAnswerModel()
-        except Exception:
-            return None
+        try: return BedrockAnswerModel()
+        except Exception: return None
     if provider == "groq":
-        try:
-            return GroqAnswerModel()
-        except Exception:
-            return None
+        try: return GroqAnswerModel()
+        except Exception: return None
     if os.getenv("GROQ_API_KEY") and os.getenv("GROQ_MODEL"):
-        try:
-            return GroqAnswerModel()
-        except Exception:
-            pass
+        try: return GroqAnswerModel()
+        except Exception: pass
     if os.getenv("BEDROCK_MODEL_ID"):
-        try:
-            return BedrockAnswerModel()
-        except Exception:
-            pass
+        try: return BedrockAnswerModel()
+        except Exception: pass
     return None
 
-orchestrator = CoachAIOrchestrator(answer_model=build_cloud_model())
+orchestrator = CoachAIOrchestrator(
+    answer_model=build_cloud_model(),
+    cloud_budget=CloudBudget(max_llm_calls_per_day=int(os.getenv("MAX_LLM_CALLS_PER_DAY", "1000"))),
+)
+rate_limiter = SlidingWindowLimiter(
+    max_requests=int(os.getenv("MAX_REQUESTS_PER_MINUTE", "30")),
+    window_seconds=60,
+)
 UPLOAD_DIR = Path(os.getenv("DOCUMENT_STORAGE_PATH", "data/documents"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 tts_cache = TTLCache(ttl_seconds=int(os.getenv("TTS_CACHE_TTL_SECONDS", "3600")), max_items=256)
@@ -99,16 +102,7 @@ async def health():
 @app.get("/kpis", dependencies=[Depends(require_admin)])
 async def kpis():
     snapshot = metrics.snapshot()
-    return {
-        "kpis": snapshot,
-        "alerts": [a.__dict__ for a in evaluate_alerts(snapshot)],
-        "documents": {
-            "total": len(documents.documents),
-            "pending_review": sum(d.status == "PENDING_REVIEW" for d in documents.documents.values()),
-            "active": sum(d.status == "ACTIVE" for d in documents.documents.values()),
-        },
-        "human_review_queue": {"open": len(ops.list_reviews("OPEN"))},
-    }
+    return {"kpis": snapshot, "alerts": [a.__dict__ for a in evaluate_alerts(snapshot)], "documents": {"total": len(documents.documents), "pending_review": sum(d.status == "PENDING_REVIEW" for d in documents.documents.values()), "active": sum(d.status == "ACTIVE" for d in documents.documents.values())}, "human_review_queue": {"open": len(ops.list_reviews("OPEN"))}}
 
 @app.get("/voices")
 async def voices(): return [v.__dict__ for v in VOICES]
@@ -121,14 +115,11 @@ async def approve_document(document_id: str, reviewer: str = "admin"):
     try:
         archived = documents.activate(document_id, reviewer)
         store.set_document_status(document_id, DocumentStatus.ACTIVE)
-        for archived_id in archived:
-            store.set_document_status(archived_id, DocumentStatus.ARCHIVED)
+        for archived_id in archived: store.set_document_status(archived_id, DocumentStatus.ARCHIVED)
         event = ops.audit("DOCUMENT_ACTIVATED", reviewer, document_id, {"archived_versions": archived})
         return {"status": "ACTIVE", "document_id": document_id, "archived_versions": archived, "audit_event_id": event.event_id}
-    except KeyError:
-        raise HTTPException(404, "Document not found") from None
-    except ValueError as exc:
-        raise HTTPException(409, str(exc)) from exc
+    except KeyError: raise HTTPException(404, "Document not found") from None
+    except ValueError as exc: raise HTTPException(409, str(exc)) from exc
 
 @app.post("/admin/documents/{document_id}/reject", dependencies=[Depends(require_admin)])
 async def reject_document(document_id: str, reviewer: str = "admin"):
@@ -137,10 +128,8 @@ async def reject_document(document_id: str, reviewer: str = "admin"):
         store.set_document_status(document_id, DocumentStatus.REJECTED)
         event = ops.audit("DOCUMENT_REJECTED", reviewer, document_id, {})
         return {"status": "REJECTED", "document_id": document_id, "audit_event_id": event.event_id}
-    except KeyError:
-        raise HTTPException(404, "Document not found") from None
-    except ValueError as exc:
-        raise HTTPException(409, str(exc)) from exc
+    except KeyError: raise HTTPException(404, "Document not found") from None
+    except ValueError as exc: raise HTTPException(409, str(exc)) from exc
 
 @app.get("/reviews", dependencies=[Depends(require_admin)])
 async def list_reviews(status: str | None = None): return [r.__dict__ for r in ops.list_reviews(status)]
@@ -151,8 +140,7 @@ async def resolve_review(review_id: str, request: ReviewResolution):
         item = ops.resolve_review(review_id, request.reviewer, request.resolution)
         ops.audit("HUMAN_REVIEW_RESOLVED", request.reviewer, review_id, {"resolution": request.resolution})
         return item.__dict__
-    except KeyError:
-        raise HTTPException(404, "Review not found") from None
+    except KeyError: raise HTTPException(404, "Review not found") from None
 
 @app.get("/audit", dependencies=[Depends(require_admin)])
 async def audit(): return [e.__dict__ for e in reversed(ops.audit_events[-200:])]
@@ -165,30 +153,33 @@ def get_retriever() -> HybridRetriever:
     return retriever
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+async def chat(request: Request, payload: ChatRequest):
     started = time.perf_counter()
-    if request.voice_id not in {v.voice_id for v in VOICES}:
-        raise HTTPException(400, "Unknown voice")
-    if request.conversation_style not in {"friendly", "professional", "concise"}:
-        raise HTTPException(400, "Unsupported conversation style")
+    client_key = request.headers.get("X-Client-Id") or (request.client.host if request.client else "unknown")
+    if not rate_limiter.allow(client_key):
+        metrics.record("rate_limit_block")
+        raise HTTPException(429, "Too many requests. Please try again shortly.")
+    if payload.voice_id not in {v.voice_id for v in VOICES}: raise HTTPException(400, "Unknown voice")
+    if payload.conversation_style not in {"friendly", "professional", "concise"}: raise HTTPException(400, "Unsupported conversation style")
 
-    conversation_id = request.conversation_id or uuid4().hex
+    conversation_id = payload.conversation_id or uuid4().hex
     orchestrator.retriever = get_retriever()
     orchestrator.knowledge_generation = store.generation
-    result = await orchestrator.run(request.message, conversation_id, request.conversation_style, request.voice_id)
+    result = await orchestrator.run(payload.message, conversation_id, payload.conversation_style, payload.voice_id)
     elapsed = (time.perf_counter() - started) * 1000
 
-    if result.get("performance", {}).get("cache_hit"): metrics.record("cache_hit", elapsed)
-    elif result.get("performance", {}).get("llm_called"): metrics.record("llm_call", elapsed, input_tokens=len(request.message)//4, output_tokens=len(result.get("answer",""))//4)
-    else: metrics.record("fast_path", elapsed)
-
+    perf = result.get("performance", {})
+    if perf.get("cache_hit"): metrics.record("cache_hit")
+    elif perf.get("llm_called"): metrics.record("llm_call", input_tokens=len(payload.message)//4, output_tokens=len(result.get("answer",""))//4)
+    else: metrics.record("fast_path")
+    if perf.get("budget_blocked"): metrics.record("budget_block")
     metrics.record("abstention" if result.get("abstained") else "answer", elapsed)
-    if result.get("security_blocked"): metrics.record("security_block", elapsed)
+    if result.get("security_blocked"): metrics.record("security_block")
     review_id = None
     if result.get("next_action") == "human_review":
-        item = ops.enqueue_review(result.get("reason", result.get("intent", "human_review")), request.message, conversation_id)
+        item = ops.enqueue_review(result.get("reason", result.get("intent", "human_review")), payload.message, conversation_id)
         review_id = item.review_id
-        metrics.record("human_escalation", elapsed)
+        metrics.record("human_escalation")
         ops.audit("HUMAN_REVIEW_CREATED", "system", review_id, {"intent": result.get("intent")})
     result["conversation_id"] = conversation_id
     if review_id: result["review_id"] = review_id
