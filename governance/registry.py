@@ -289,6 +289,7 @@ class GovernanceRegistry:
             row["prompt_key"], row["version"], row["prompt_hash"], row["template"],
             row["status"], row["owner"], row["approved_by"],
             row["approved_at"].isoformat() if row["approved_at"] else None,
+            row["evaluation_reference"],
             row["created_at"].isoformat(),
         )
 
@@ -308,5 +309,6 @@ class GovernanceRegistry:
             row["model_key"], row["version"], row["provider"], row["model_name"],
             row["status"], row["configuration"] or {}, row["owner"], row["approved_by"],
             row["approved_at"].isoformat() if row["approved_at"] else None,
+            row["evaluation_reference"],
             row["created_at"].isoformat(),
         )
