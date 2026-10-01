@@ -6,5 +6,8 @@ def test_script_detection_for_indic_languages():
     assert detect_script_language("இது ஒரு தேர்வு") == "ta-IN"
 
 def test_language_metadata():
-    assert get_language("hi-IN").translate_code == "hi"
-    assert get_language("en-GB").polly_code == "en-GB"
+    assert get_language("hi-IN").translate_code=="hi"
+    assert get_language("en-GB").polly_code=="en-GB"
+
+def test_auto_detect_defaults_latin_to_uk_english():
+    assert detect_script_language("What is the course fee?")=="en-GB"
