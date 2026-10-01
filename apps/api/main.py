@@ -15,6 +15,7 @@ from agents.budget import CloudBudget
 from agents.cache import TTLCache
 from agents.groq_model import GroqAnswerModel
 from agents.orchestrator import CoachAIOrchestrator
+from agents.conversation import memory
 from language.messages import message as localized_message
 from language.registry import get_language
 from knowledge.chunker import semantic_chunks
