@@ -30,13 +30,29 @@ from security.rate_limit import SlidingWindowLimiter
 from translation.service import TranslationService
 from voice.language_voices import available_polly_voice, language_capabilities
 from voice.providers import VOICES, AmazonPollyProvider
+from storage.aws_ingestion import AWSIngestionPublisher
+from storage.postgres import PostgresRuntime
 
 load_dotenv()
 
-app=FastAPI(title="CoachAI API",version="1.5.0")
-store=InMemoryKnowledgeStore()
+app=FastAPI(title="CoachAI API",version="1.6.0")
+DATABASE_URL=os.getenv("DATABASE_URL","").strip()
+RUNTIME_BACKEND="postgres" if DATABASE_URL else "memory"
+postgres_runtime=PostgresRuntime(
+    DATABASE_URL,
+    auto_init_schema=os.getenv("POSTGRES_AUTO_INIT_SCHEMA","false").lower()=="true",
+) if DATABASE_URL else None
+if postgres_runtime:
+    store=postgres_runtime.knowledge_store()
+    documents=postgres_runtime.document_registry()
+    ops=postgres_runtime.ops()
+else:
+    store=InMemoryKnowledgeStore()
+    from knowledge.document_registry import documents
+    from ops.runtime import ops
 retriever:HybridRetriever|None=None
 retriever_generation=-1
+INGESTION_MODE=os.getenv("INGESTION_MODE","inline").lower()
 
 def build_cloud_model():
     if os.getenv("LLM_ENABLED","true").lower()!="true":return None
@@ -88,7 +104,7 @@ async def dashboard():return FileResponse("web/dashboard.html")
 
 @app.get("/config")
 async def config():
-    return {"tts_mode":os.getenv("TTS_MODE","browser"),"llm_provider":os.getenv("LLM_PROVIDER","auto"),"translation_provider":os.getenv("TRANSLATION_PROVIDER","none"),"fast_path_default":True,"governed_ingestion":True}
+    return {"tts_mode":os.getenv("TTS_MODE","browser"),"llm_provider":os.getenv("LLM_PROVIDER","auto"),"translation_provider":os.getenv("TRANSLATION_PROVIDER","none"),"fast_path_default":True,"governed_ingestion":True,"runtime_backend":RUNTIME_BACKEND,"ingestion_mode":INGESTION_MODE}
 
 @app.get("/languages")
 async def languages():
@@ -99,12 +115,13 @@ async def languages():
 
 @app.get("/health")
 async def health():
-    return {"status":"ok","service":"coachai-api","generation":store.generation,"retriever_ready":retriever is not None and retriever_generation==store.generation,"open_reviews":len(ops.list_reviews("OPEN"))}
+    return {"status":"ok","service":"coachai-api","generation":store.generation,"retriever_ready":retriever is not None and retriever_generation==store.generation,"open_reviews":len(ops.list_reviews("OPEN")),"runtime_backend":RUNTIME_BACKEND,"ingestion_mode":INGESTION_MODE}
 
 @app.get("/kpis",dependencies=[Depends(require_admin)])
 async def kpis():
     snapshot=metrics.snapshot()
-    return {"kpis":snapshot,"alerts":[a.__dict__ for a in evaluate_alerts(snapshot)],"documents":{"total":len(documents.documents),"pending_review":sum(d.status=="PENDING_REVIEW" for d in documents.documents.values()),"active":sum(d.status=="ACTIVE" for d in documents.documents.values())},"human_review_queue":{"open":len(ops.list_reviews("OPEN"))}}
+    doc_counts=documents.counts()
+    return {"kpis":snapshot,"alerts":[a.__dict__ for a in evaluate_alerts(snapshot)],"documents":{"total":sum(doc_counts.values()),"pending_review":doc_counts.get("PENDING_REVIEW",0),"active":doc_counts.get("ACTIVE",0),"by_status":doc_counts},"human_review_queue":{"open":len(ops.list_reviews("OPEN"))}}
 
 @app.get("/voices")
 async def voices():return [v.__dict__ for v in VOICES]
@@ -146,7 +163,10 @@ async def resolve_review(review_id:str,request:ReviewResolution):
     except KeyError:raise HTTPException(404,"Review not found") from None
 
 @app.get("/audit",dependencies=[Depends(require_admin)])
-async def audit():return [e.__dict__ for e in reversed(ops.audit_events[-200:])]
+async def audit():
+    if hasattr(ops,"list_audit"):
+        return [e.__dict__ for e in ops.list_audit(200)]
+    return [e.__dict__ for e in reversed(ops.audit_events[-200:])]
 
 def get_retriever()->HybridRetriever:
     global retriever,retriever_generation
@@ -200,16 +220,31 @@ async def upload_document(file:UploadFile=File(...)):
                 destination.unlink(missing_ok=True);raise HTTPException(413,f"File exceeds MAX_UPLOAD_MB={MAX_UPLOAD_BYTES//(1024*1024)}.")
             content_hash.update(chunk);output.write(chunk)
     digest=content_hash.hexdigest()
-    if any(d.content_hash==digest for d in documents.documents.values()):
+    if any(d.content_hash==digest for d in documents.list()):
         destination.unlink(missing_ok=True);raise HTTPException(409,"This document content already exists.")
     version=documents.next_version(original_name)
     try:
+        if INGESTION_MODE=="aws_async":
+            if not postgres_runtime:
+                destination.unlink(missing_ok=True)
+                raise HTTPException(503,"AWS async ingestion requires DATABASE_URL.")
+            publisher=AWSIngestionPublisher()
+            source_uri=publisher.upload_file(destination,document_id=document_id,filename=original_name,version=version,content_hash=digest)
+            documents.add(ManagedDocument(document_id,original_name,version,digest,"general","PROCESSING",datetime.now(timezone.utc),source_uri=source_uri))
+            publisher.enqueue(document_id=document_id,filename=original_name,version=version,content_hash=digest,source_uri=source_uri)
+            event=ops.audit("DOCUMENT_INGESTION_QUEUED","system",document_id,{"filename":original_name,"version":version,"content_hash":digest,"source_uri":source_uri})
+            destination.unlink(missing_ok=True)
+            return {"document_id":document_id,"filename":original_name,"version":version,"status":"PROCESSING","ingestion":"queued","message":"Document stored in S3 and queued for background processing. It will require admin approval after processing.","audit_event_id":event.event_id}
+
         normalized=parse_document(destination);chunks=semantic_chunks(normalized)
         metadata=DocumentMetadata(document_id,original_name,version,"general",DocumentStatus.PENDING_REVIEW)
         converted=[DocumentChunk(f"{document_id}-{i}",metadata,c.location.page,c.location.section,c.text) for i,c in enumerate(chunks)]
-        store.add(converted);documents.add(ManagedDocument(document_id,original_name,version,digest,"general","PENDING_REVIEW",datetime.now(timezone.utc)))
+        documents.add(ManagedDocument(document_id,original_name,version,digest,"general","PENDING_REVIEW",datetime.now(timezone.utc)))
+        store.add(converted)
         event=ops.audit("DOCUMENT_UPLOADED","system",document_id,{"filename":original_name,"version":version,"content_hash":digest,"chunks":len(converted)})
         return {"document_id":document_id,"filename":original_name,"format":normalized.document_type.value,"version":version,"chunks_indexed":len(converted),"status":"PENDING_REVIEW","message":"Document processed. An admin must approve it before students can use it.","audit_event_id":event.event_id}
+    except HTTPException:
+        raise
     except Exception as exc:
         destination.unlink(missing_ok=True);raise HTTPException(422,f"Document extraction failed: {exc}") from exc
 
