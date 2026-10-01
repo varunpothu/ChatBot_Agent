@@ -2,26 +2,10 @@
 
 Text language support and voice support are intentionally separate capabilities.
 
-| Language | Text | Script auto-detect | Browser STT locale | Browser TTS locale | Polly language |
-| English | Yes | Yes | en-GB / en-US | en-GB / en-US | Yes |
-| Hindi | Yes | Yes | hi-IN | hi-IN | Yes |
-| Telugu | Yes | Yes | te-IN | te-IN | Not assumed |
-| Tamil | Yes | Yes | ta-IN | ta-IN | Not assumed |
-| Bengali | Yes | Yes | bn-IN | bn-IN | Not assumed |
-| Kannada | Yes | Yes | kn-IN | kn-IN | Not assumed |
-| Marathi | Yes | Yes where script is present | provider/device dependent | provider/device dependent | provider dependent |
-| Gujarati | Yes | Yes | provider/device dependent | provider/device dependent | provider dependent |
-| Punjabi | Yes | Yes | provider/device dependent | provider/device dependent | provider dependent |
-| Urdu | Yes | Partial | ur-PK | ur-PK | provider dependent |
-| Arabic | Yes | Partial | ar-SA | ar-SA | Yes |
-| Spanish | Yes | No | es-ES | es-ES | Yes |
-| French | Yes | No | fr-FR | fr-FR | Yes |
-| German | Yes | No | de-DE | de-DE | Yes |
-| Italian | Yes | No | it-IT | it-IT | Yes |
-| Portuguese | Yes | No | pt-PT | pt-PT | Yes |
-| Japanese | Yes | Yes | ja-JP | ja-JP | Yes |
-| Chinese | Yes | Yes | zh-CN | zh-CN | Yes |
+The application currently exposes language choices for English, Hindi, Telugu, Tamil, Bengali, Marathi, Gujarati, Punjabi, Urdu, Kannada, Malayalam, Spanish, French, German, Arabic, Italian, Portuguese, Japanese and Simplified Chinese.
 
-Browser speech availability depends on the user's browser and installed operating-system voices.
+Browser STT uses the selected speech locale. Browser TTS uses the same locale and then lets the operating system/browser select an installed voice.
 
-Cloud voice IDs are provider configuration, not hard-coded truth. The project should call the provider capabilities endpoint before enabling a voice in a production UI.
+Amazon Transcribe currently supports streaming for many of these languages, including Hindi, Bengali, Tamil, Telugu and Kannada. Amazon Polly supports a broad set of languages, including Hindi, English, Spanish, French, German, Italian, Portuguese, Japanese, Chinese and Arabic, but coverage is not identical to Transcribe or Translate.
+
+Cloud voice selection is therefore provider-aware. The production implementation must use provider capability discovery rather than assuming a hard-coded voice is available in every AWS region.
