@@ -16,5 +16,7 @@ jobs:
         run: pip install -e .
       - name: Tests
         run: pytest -q
-      - name: AI assurance checks
-        run: python -m compileall agents rag knowledge monitoring governance evaluation ai_controls
+      - name: Deterministic retrieval and grounding gate
+        run: python -m evaluation.ci_gate
+      - name: Compile
+        run: python -m compileall agents rag knowledge monitoring governance evaluation ai_controls voice storage
