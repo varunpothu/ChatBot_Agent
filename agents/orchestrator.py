@@ -2,6 +2,7 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any
 
+from agents.budget import CloudBudget
 from agents.cache import TTLCache
 from agents.conversation import memory
 from agents.cost_policy import CostPolicy, trim_evidence
@@ -18,6 +19,7 @@ class CoachAIOrchestrator:
     retriever: HybridRetriever | None = None
     answer_model: AnswerModel | None = None
     policy: CostPolicy = field(default_factory=CostPolicy.from_env)
+    cloud_budget: CloudBudget = field(default_factory=lambda: CloudBudget())
     cache: TTLCache = field(init=False)
     knowledge_generation: int = 0
 
@@ -74,14 +76,16 @@ class CoachAIOrchestrator:
             return result
 
         evidence = trim_evidence([r.chunk.text for r in results], self.policy.max_evidence_chars)
+        budget_blocked = False
         use_llm = route.answer_mode == "deep" and self.answer_model is not None and self.policy.llm_enabled
-        model = self.answer_model if use_llm else ExtractiveAnswerModel()
+        if use_llm and not self.cloud_budget.allow():
+            use_llm = False
+            budget_blocked = True
 
+        model = self.answer_model if use_llm else ExtractiveAnswerModel()
         try:
             draft = await model.generate(resolved_message, evidence, style)
         except Exception as exc:
-            # A failed cloud call never makes the user wait forever. Fall back
-            # to the deterministic path, which remains grounded.
             draft = await ExtractiveAnswerModel().generate(resolved_message, evidence, style)
             use_llm = False
             cloud_error = str(exc)[:160]
@@ -93,11 +97,7 @@ class CoachAIOrchestrator:
             memory.remember(conversation_id, resolved_message, route.intent)
             return result
 
-        answer = (
-            humanize_deep_answer(draft, style)
-            if use_llm
-            else humanize_factual_answer(draft, style, resolved_message)
-        )
+        answer = humanize_deep_answer(draft, style) if use_llm else humanize_factual_answer(draft, style, resolved_message)
         verification = verify_claims(answer, evidence)
         if not verification.grounded:
             result = self._abstain(conversation_id, route.intent, "Answer failed grounding verification.", voice_id, style)
@@ -117,6 +117,7 @@ class CoachAIOrchestrator:
                 "path": "deep_llm" if use_llm else "fast_extract",
                 "cache_hit": False,
                 "llm_called": use_llm,
+                "budget_blocked": budget_blocked,
                 "cloud_fallback": cloud_error is not None,
                 "cloud_error": cloud_error,
                 "evidence_chunks": len(evidence),
