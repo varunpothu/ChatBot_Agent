@@ -19,6 +19,8 @@ jobs:
         run: pytest -q -m "not integration"
       - name: Deterministic retrieval and grounding gate
         run: python -m evaluation.ci_gate
+      - name: Quality benchmark
+        run: python -m evaluation.benchmark
       - name: Compile
         run: python -m compileall agents rag knowledge monitoring governance evaluation ai_controls voice storage infra workers apps
 
@@ -60,6 +62,20 @@ jobs:
         run: pip install -e .
       - name: Integration tests
         run: pytest -m integration -q
+
+  terraform-quality:
+    name: Terraform validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - name: Format check
+        run: terraform fmt -check -recursive infra/terraform
+      - name: Validate
+        working-directory: infra/terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
 
   package-smoke:
     name: Packaging smoke test
