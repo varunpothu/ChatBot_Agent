@@ -10,7 +10,7 @@ import time
 from knowledge.chunker import semantic_chunks
 from knowledge.parsers import parse_document
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
-from rag.managed_embeddings import build_bedrock_embedding_provider
+from rag.managed_embeddings import CachedEmbeddingProvider, build_bedrock_embedding_provider
 from storage.postgres import PostgresRuntime
 
 
@@ -52,7 +52,15 @@ class IngestionWorker:
                 category=metadata.category,
                 status=DocumentStatus.PENDING_REVIEW,
             )
-            embedding_provider = build_bedrock_embedding_provider()
+            cache=None
+            if os.getenv("REDIS_URL","").strip():
+                from infra.redis_runtime import RedisTTLCache
+                cache=RedisTTLCache(
+                    os.getenv("REDIS_URL",""),
+                    ttl_seconds=int(os.getenv("EMBEDDING_CACHE_TTL_SECONDS","900")),
+                    namespace="coachai:document-embeddings",
+                )
+            embedding_provider = CachedEmbeddingProvider(build_bedrock_embedding_provider(), cache=cache)
             vectors = embedding_provider.embed([item.text for item in chunks])
             converted = [
                 DocumentChunk(
