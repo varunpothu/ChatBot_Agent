@@ -107,7 +107,8 @@ resource "aws_cloudwatch_metric_alarm" "redis_cpu" {
   alarm_description   = "CoachAI Redis CPU utilization is elevated."
 
   dimensions = {
-    CacheClusterId = aws_elasticache_replication_group.main.member_clusters[0]
+    ReplicationGroupId = aws_elasticache_replication_group.main.id
+    Role              = "Primary"
   }
 }
 
