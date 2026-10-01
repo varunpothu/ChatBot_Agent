@@ -18,15 +18,4 @@ def available_polly_voice(language: str, gender: str = "female") -> str | None:
     return DEFAULT_POLLY_VOICES.get(language, {}).get(gender)
 
 def language_capabilities() -> list[dict]:
-    return [
-        {
-            "code": language.code,
-            "name": language.name,
-            "native_name": language.native_name,
-            "speech_code": language.speech_code,
-            "translate_code": language.translate_code,
-            "polly_code": language.polly_code,
-            "cloud_tts": language.polly_code is not None,
-        }
-        for language in LANGUAGES
-    ]
+    return [{"code":x.code,"name":x.name,"native_name":x.native_name,"speech_code":x.speech_code,"translate_code":x.translate_code,"polly_code":x.polly_code,"cloud_tts":x.polly_code is not None} for x in LANGUAGES]
