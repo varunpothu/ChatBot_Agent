@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import os
 
 @dataclass(frozen=True)
 class Voice:
@@ -7,12 +8,17 @@ class Voice:
     language: str
 
 VOICES = [
-    Voice("en-GB-voice-1","British voice 1","en-GB"),
-    Voice("en-GB-voice-2","British voice 2","en-GB"),
-    Voice("en-US-voice-1","US voice 1","en-US"),
-    Voice("en-US-voice-2","US voice 2","en-US"),
+    Voice("Matthew","Male voice","en-US"),
+    Voice("Joanna","Female voice","en-US"),
+    Voice("Brian","British Male voice","en-GB"),
+    Voice("Amy","British Female voice","en-GB"),
 ]
 
-class VoiceProvider:
+class AmazonPollyProvider:
+    def __init__(self):
+        import boto3
+        self.client = boto3.client("polly", region_name=os.getenv("AWS_REGION", "eu-west-2"))
+
     def synthesize(self, text: str, voice_id: str) -> bytes:
-        raise NotImplementedError("Connect Amazon Polly or another TTS provider.")
+        result = self.client.synthesize_speech(Text=text, VoiceId=voice_id, OutputFormat="mp3", Engine="neural")
+        return result["AudioStream"].read()
