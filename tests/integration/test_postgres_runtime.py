@@ -7,6 +7,7 @@ from knowledge.document_registry import ManagedDocument
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
 from rag.retrieval import PostgresHybridRetriever
 from storage.postgres import PostgresRuntime
+from governance.registry import GovernanceRegistry
 
 pytestmark = pytest.mark.integration
 
@@ -99,4 +100,28 @@ def test_postgres_vector_retrieval_hits_persisted_embedding():
     assert len(results) == 1
     assert results[0].chunk.text.startswith("Refund requests")
     assert results[0].semantic_score > 0.99
+    runtime.engine.dispose()
+
+
+def test_postgres_governance_requires_evaluation_reference_for_activation():
+    runtime = get_runtime()
+    registry = GovernanceRegistry(runtime)
+
+    prompt = registry.register_prompt(
+        "answer.integration",
+        "v1",
+        "Answer only from evidence in {TARGET_LANGUAGE}.",
+        owner="integration-test",
+    )
+    assert prompt.status == "PENDING_REVIEW"
+
+    registry.approve_prompt("answer.integration", "v1", "reviewer", "ci://golden/answer-integration-v1")
+    active = registry.activate_prompt(
+        "answer.integration",
+        "v1",
+        "reviewer",
+        "ci://golden/answer-integration-v1",
+    )
+    assert active.status == "ACTIVE"
+    assert active.evaluation_reference == "ci://golden/answer-integration-v1"
     runtime.engine.dispose()
