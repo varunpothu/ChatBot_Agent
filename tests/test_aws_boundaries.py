@@ -42,3 +42,35 @@ def test_transcribe_provider_reports_missing_optional_sdk(monkeypatch):
 
     with pytest.raises(RuntimeError, match="optional voice dependency"):
         asyncio.run(provider.transcribe_stream(one_chunk(), TranscribeAudioConfig()))
+
+
+def test_polly_dynamic_discovery_filters_and_caches():
+    from voice.providers import AmazonPollyProvider
+
+    class FakePollyClient:
+        def __init__(self):
+            self.calls = 0
+
+        def describe_voices(self, **kwargs):
+            self.calls += 1
+            assert kwargs["Engine"] == "neural"
+            assert kwargs["LanguageCode"] == "hi-IN"
+            assert kwargs["IncludeAdditionalLanguageCodes"] is True
+            return {
+                "Voices": [
+                    {"Id": "Aditi", "Name": "Aditi", "LanguageCode": "hi-IN", "Gender": "Female"}
+                ]
+            }
+
+    provider = object.__new__(AmazonPollyProvider)
+    provider.engine = "neural"
+    provider.voice_cache_ttl = 21600
+    provider._voice_cache = {}
+    provider.client = FakePollyClient()
+
+    first = provider.discover_voices(language="hi-IN")
+    second = provider.discover_voices(language="hi-IN")
+
+    assert first[0].voice_id == "Aditi"
+    assert second[0].voice_id == "Aditi"
+    assert provider.client.calls == 1
