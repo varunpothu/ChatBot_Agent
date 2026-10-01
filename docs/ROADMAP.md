@@ -48,19 +48,24 @@
 - PostgreSQL/pgvector production schema
 - S3/SQS/Textract/ECS/CloudWatch/Secrets Manager/IAM target architecture
 
-## Still to integrate for a multi-instance production deployment
+## Integrated production foundations
 
-1. PostgreSQL/pgvector as the runtime source of truth, replacing the in-memory store.
-2. S3 as immutable document storage.
-3. SQS workers for parsing, OCR, chunking and embeddings.
-4. AWS Textract for scanned/image documents.
-5. Distributed cache/rate limiting with Redis/ElastiCache or gateway controls.
-6. Amazon Transcribe streaming adapter for server-side voice.
-7. OIDC/IAM/API Gateway authentication instead of the development admin-key mechanism.
-8. Full model/prompt registry persistence and approval workflow.
-9. Larger golden evaluation suite covering retrieval, citations, faithfulness, multilingual translation quality, adversarial inputs, latency and cost.
-10. Terraform/IaC, deployment pipelines, CloudWatch SLOs and operational runbooks.
-11. Dynamic provider capability discovery for cloud voice selection.
+- PostgreSQL/pgvector runtime backend is selected with DATABASE_URL.
+- Durable governed document registry, knowledge generation, audit events and human-review queue are available.
+- S3 immutable document source plus an SQS background ingestion path is available through INGESTION_MODE=aws_async.
+- The ingestion worker verifies the S3 SHA-256 manifest and uses SQS long polling with safe retry semantics.
+- Inline ingestion remains the default for local development.
+
+## Still to integrate for a full production deployment
+
+1. AWS Textract for scanned/image documents and managed embedding workers.
+2. Distributed cache/rate limiting with Redis/ElastiCache or gateway controls.
+3. Amazon Transcribe streaming adapter for server-side voice.
+4. OIDC/IAM/API Gateway authentication instead of the development admin-key mechanism.
+5. Full model/prompt registry persistence and approval workflow.
+6. Larger golden evaluation suite covering retrieval, citations, faithfulness, multilingual translation quality, adversarial inputs, latency and cost.
+7. Terraform/IaC, deployment pipelines, CloudWatch SLOs and operational runbooks.
+8. Dynamic provider capability discovery for cloud voice selection.
 
 ## Scale target
 
