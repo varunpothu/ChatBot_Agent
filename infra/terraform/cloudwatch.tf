@@ -169,7 +169,7 @@ resource "aws_cloudwatch_dashboard" "main" {
           region = var.aws_region
           metrics = [
             ["AWS/RDS", "CPUUtilization", "DBInstanceIdentifier", aws_db_instance.main.id],
-            ["AWS/ElastiCache", "EngineCPUUtilization", "CacheClusterId", aws_elasticache_replication_group.main.id]
+            ["AWS/ElastiCache", "EngineCPUUtilization", "ReplicationGroupId", aws_elasticache_replication_group.main.id, "Role", "Primary"]
           ]
           period = 300
           stat   = "Average"
