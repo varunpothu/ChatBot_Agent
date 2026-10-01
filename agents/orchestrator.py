@@ -29,7 +29,7 @@ class CoachAIOrchestrator:
     translation_cache:Any|None=None
     knowledge_generation:int=0
     source_language:str="en"
-    conversation_memory:Any=memory
+    conversation_memory:Any=field(default_factory=lambda: memory)
 
     def __post_init__(self):
         if self.cache is None:
@@ -93,7 +93,7 @@ class CoachAIOrchestrator:
         results=self.retriever.search(retrieval_query,top_k=self.policy.retrieval_top_k)
         if not results or results[0].final_score<self.policy.low_score_threshold:
             result=self._abstain(conversation_id,route.intent,"No sufficiently strong approved evidence was found.",voice_meta)
-            memory.remember(conversation_id,retrieval_query,route.intent);return result
+            self.conversation_memory.remember(conversation_id,retrieval_query,route.intent);return result
 
         results=self._adaptive_results(results)
         evidence=trim_evidence([r.chunk.text for r in results],self.policy.max_evidence_chars)
