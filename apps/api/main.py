@@ -32,6 +32,7 @@ from voice.language_voices import available_polly_voice, language_capabilities
 from voice.providers import VOICES, AmazonPollyProvider
 from storage.aws_ingestion import AWSIngestionPublisher
 from storage.postgres import PostgresRuntime
+from infra.redis_runtime import RedisSlidingWindowLimiter, RedisTTLCache
 
 load_dotenv()
 
@@ -65,12 +66,23 @@ def build_cloud_model():
     except Exception:return None
     return None
 
+REDIS_URL=os.getenv("REDIS_URL","").strip()
+if REDIS_URL:
+    shared_cache=RedisTTLCache(REDIS_URL,ttl_seconds=int(os.getenv("RESPONSE_CACHE_TTL_SECONDS","300")),namespace="coachai:responses")
+    shared_translation_cache=RedisTTLCache(REDIS_URL,ttl_seconds=max(int(os.getenv("RESPONSE_CACHE_TTL_SECONDS","300")),600),namespace="coachai:translations")
+    rate_limiter=RedisSlidingWindowLimiter(REDIS_URL,int(os.getenv("MAX_REQUESTS_PER_MINUTE","30")),60)
+else:
+    shared_cache=None
+    shared_translation_cache=None
+    rate_limiter=SlidingWindowLimiter(int(os.getenv("MAX_REQUESTS_PER_MINUTE","30")),60)
+
 orchestrator=CoachAIOrchestrator(
     answer_model=build_cloud_model(),
     translator=TranslationService(),
     cloud_budget=CloudBudget(max_llm_calls_per_day=int(os.getenv("MAX_LLM_CALLS_PER_DAY","1000"))),
+    cache=shared_cache,
+    translation_cache=shared_translation_cache,
 )
-rate_limiter=SlidingWindowLimiter(int(os.getenv("MAX_REQUESTS_PER_MINUTE","30")),60)
 UPLOAD_DIR=Path(os.getenv("DOCUMENT_STORAGE_PATH","data/documents"));UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
 MAX_UPLOAD_BYTES=int(os.getenv("MAX_UPLOAD_MB","25"))*1024*1024
 tts_cache=TTLCache(ttl_seconds=int(os.getenv("TTS_CACHE_TTL_SECONDS","3600")),max_items=256)
@@ -104,7 +116,7 @@ async def dashboard():return FileResponse("web/dashboard.html")
 
 @app.get("/config")
 async def config():
-    return {"tts_mode":os.getenv("TTS_MODE","browser"),"llm_provider":os.getenv("LLM_PROVIDER","auto"),"translation_provider":os.getenv("TRANSLATION_PROVIDER","none"),"fast_path_default":True,"governed_ingestion":True,"runtime_backend":RUNTIME_BACKEND,"ingestion_mode":INGESTION_MODE}
+    return {"tts_mode":os.getenv("TTS_MODE","browser"),"llm_provider":os.getenv("LLM_PROVIDER","auto"),"translation_provider":os.getenv("TRANSLATION_PROVIDER","none"),"fast_path_default":True,"governed_ingestion":True,"runtime_backend":RUNTIME_BACKEND,"ingestion_mode":INGESTION_MODE,"distributed_cache":bool(REDIS_URL)}
 
 @app.get("/languages")
 async def languages():
