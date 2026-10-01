@@ -29,6 +29,7 @@ class CoachAIOrchestrator:
     translation_cache:Any|None=None
     knowledge_generation:int=0
     source_language:str="en"
+    conversation_memory:Any=memory
 
     def __post_init__(self):
         if self.cache is None:
@@ -57,19 +58,19 @@ class CoachAIOrchestrator:
 
     async def run(self,message,conversation_id=None,style="friendly",voice_id="Brian",language="auto"):
         message=" ".join(message.split())[:self.policy.max_input_chars]
-        resolved_message=memory.resolve(conversation_id,message)
+        resolved_message=self.conversation_memory.resolve(conversation_id,message)
         target_code=detect_script_language(message) if language=="auto" else language
         target=get_language(target_code)
         voice_meta={"voice_id":voice_id,"style":style,"language":target.code,"language_name":target.name}
 
         if looks_like_prompt_injection(message):
             result={"conversation_id":conversation_id,"answer":localized_message("security",target.code),"intent":"security","abstained":True,"security_blocked":True,"next_action":"human_review","voice":voice_meta,"language":target.code}
-            memory.remember(conversation_id,message,"security");return result
+            self.conversation_memory.remember(conversation_id,message,"security");return result
 
         route=route_query(resolved_message,self.policy)
         if route.requires_human_review:
             result={"conversation_id":conversation_id,"answer":localized_message("human",target.code),"intent":route.intent,"abstained":False,"next_action":"human_review","voice":voice_meta,"language":target.code}
-            memory.remember(conversation_id,resolved_message,route.intent);return result
+            self.conversation_memory.remember(conversation_id,resolved_message,route.intent);return result
         if self.retriever is None:
             return self._abstain(conversation_id,route.intent,"Knowledge base is not configured.",voice_meta)
 
@@ -87,7 +88,7 @@ class CoachAIOrchestrator:
         cached=self.cache.get(cache_key)
         if cached is not None:
             cached=deepcopy(cached);cached["conversation_id"]=conversation_id;cached["voice"]=voice_meta
-            cached["performance"]["cache_hit"]=True;memory.remember(conversation_id,retrieval_query,route.intent);return cached
+            cached["performance"]["cache_hit"]=True;self.conversation_memory.remember(conversation_id,retrieval_query,route.intent);return cached
 
         results=self.retriever.search(retrieval_query,top_k=self.policy.retrieval_top_k)
         if not results or results[0].final_score<self.policy.low_score_threshold:
