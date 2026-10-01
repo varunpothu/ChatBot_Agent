@@ -19,15 +19,15 @@ from translation.service import TranslationService
 
 @dataclass
 class CoachAIOrchestrator:
-    retriever: HybridRetriever|None=None
-    answer_model: AnswerModel|None=None
-    translator: TranslationService|None=None
-    policy: CostPolicy=field(default_factory=CostPolicy.from_env)
-    cloud_budget: CloudBudget=field(default_factory=lambda: CloudBudget())
-    cache: TTLCache=field(init=False)
-    translation_cache: TTLCache=field(init=False)
-    knowledge_generation: int=0
-    source_language: str="en"
+    retriever:HybridRetriever|None=None
+    answer_model:AnswerModel|None=None
+    translator:TranslationService|None=None
+    policy:CostPolicy=field(default_factory=CostPolicy.from_env)
+    cloud_budget:CloudBudget=field(default_factory=lambda:CloudBudget())
+    cache:TTLCache=field(init=False)
+    translation_cache:TTLCache=field(init=False)
+    knowledge_generation:int=0
+    source_language:str="en"
 
     def __post_init__(self):
         self.cache=TTLCache(ttl_seconds=self.policy.cache_ttl_seconds)
@@ -43,7 +43,8 @@ class CoachAIOrchestrator:
 
     async def _translate(self,text,source,target):
         if source==target:return text
-        if not self.translator or not self.translator.enabled:raise RuntimeError("Multilingual translation is not configured.")
+        if not self.translator or not self.translator.enabled:
+            raise RuntimeError("Multilingual translation is not configured.")
         key=self.translation_cache.key(source,target,text)
         cached=self.translation_cache.get(key)
         if cached is not None:return cached
@@ -51,7 +52,7 @@ class CoachAIOrchestrator:
         self.translation_cache.set(key,value)
         return value
 
-    async def run(self,message,conversation_id=None,style="friendly",voice_id="Brian",language="auto")->dict[str,Any]:
+    async def run(self,message,conversation_id=None,style="friendly",voice_id="Brian",language="auto"):
         message=" ".join(message.split())[:self.policy.max_input_chars]
         resolved_message=memory.resolve(conversation_id,message)
         target_code=detect_script_language(message) if language=="auto" else language
@@ -66,15 +67,18 @@ class CoachAIOrchestrator:
         if route.requires_human_review:
             result={"conversation_id":conversation_id,"answer":"I can help, but this needs a member of the coaching-centre team. I’ll keep this as a human-review case.","intent":route.intent,"abstained":False,"next_action":"human_review","voice":voice_meta,"language":target.code}
             memory.remember(conversation_id,resolved_message,route.intent);return result
-        if self.retriever is None:return self._abstain(conversation_id,route.intent,"Knowledge base is not configured.",voice_meta)
+        if self.retriever is None:
+            return self._abstain(conversation_id,route.intent,"Knowledge base is not configured.",voice_meta)
 
         retrieval_query=resolved_message
         translated_query=False
-        if target.translate_code!="en":
+        native_multilingual=self.retriever.supports_cross_language
+        if target.translate_code!="en" and not native_multilingual:
             try:
                 retrieval_query=await self._translate(resolved_message,self.source_language,target.translate_code)
                 translated_query=True
-            except Exception:return self._abstain(conversation_id,route.intent,"Language bridge is unavailable for this request.",voice_meta)
+            except Exception:
+                return self._abstain(conversation_id,route.intent,"Language bridge is unavailable for this request.",voice_meta)
 
         cache_key=self.cache.key(retrieval_query.lower(),style,target.code,str(self.knowledge_generation))
         cached=self.cache.get(cache_key)
@@ -95,23 +99,28 @@ class CoachAIOrchestrator:
 
         model=self.answer_model if use_llm else ExtractiveAnswerModel()
         try:
-            generation_language="English"
-            draft=await model.generate(retrieval_query,evidence,style,generation_language)
+            draft=await model.generate(retrieval_query,evidence,style,"English")
         except Exception as exc:
             draft=await ExtractiveAnswerModel().generate(retrieval_query,evidence,style,"English")
             use_llm=False;cloud_error=str(exc)[:160]
         else:cloud_error=None
 
-        if draft.strip().upper()=="ABSTAIN":return self._abstain(conversation_id,route.intent,"The model could not produce an evidence-grounded answer.",voice_meta)
+        if draft.strip().upper()=="ABSTAIN":
+            return self._abstain(conversation_id,route.intent,"The model could not produce an evidence-grounded answer.",voice_meta)
+
         source_answer=humanize_deep_answer(draft,style) if use_llm else humanize_factual_answer(draft,style,retrieval_query)
         verification=verify_claims(source_answer,evidence)
-        if not verification.grounded:return self._abstain(conversation_id,route.intent,"Answer failed grounding verification.",voice_meta)
+        if not verification.grounded:
+            return self._abstain(conversation_id,route.intent,"Answer failed grounding verification.",voice_meta)
 
-        answer=source_answer;translated_answer=False
+        answer=source_answer
+        translated_answer=False
         if target.translate_code!="en":
             try:
-                answer=await self._translate(source_answer,"en",target.translate_code);translated_answer=True
-            except Exception:return self._abstain(conversation_id,route.intent,"The verified answer could not be translated safely.",voice_meta)
+                answer=await self._translate(source_answer,"en",target.translate_code)
+                translated_answer=True
+            except Exception:
+                return self._abstain(conversation_id,route.intent,"The verified answer could not be translated safely.",voice_meta)
 
         result={
             "conversation_id":conversation_id,
@@ -125,6 +134,7 @@ class CoachAIOrchestrator:
             "language":target.code,
             "performance":{
                 "path":"deep_llm" if use_llm else "fast_extract","cache_hit":False,"llm_called":use_llm,
+                "native_multilingual_retrieval":native_multilingual,
                 "translation_used":translated_query or translated_answer,
                 "query_translated":translated_query,"answer_translated":translated_answer,
                 "budget_blocked":budget_blocked,"cloud_fallback":cloud_error is not None,"cloud_error":cloud_error,
