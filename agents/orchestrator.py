@@ -1,16 +1,17 @@
 from dataclasses import dataclass
 from typing import Any
 
+from agents.model import AnswerModel, ExtractiveAnswerModel
 from agents.router import route_query
 from agents.verification import verify_claims
 from rag.citations import Citation
 from rag.retrieval import HybridRetriever
-from rag.models import DocumentChunk
 
 
 @dataclass
 class CoachAIOrchestrator:
     retriever: HybridRetriever | None = None
+    answer_model: AnswerModel | None = None
 
     async def run(self, message: str, conversation_id: str | None = None) -> dict[str, Any]:
         route = route_query(message)
@@ -32,12 +33,12 @@ class CoachAIOrchestrator:
             return self._abstain(conversation_id, route.intent, "No matching approved evidence was found.")
 
         evidence = [r.chunk.text for r in results]
-        # LLM generation is deliberately not performed here until the model adapter is added.
-        draft = evidence[0]
-        verification = verify_claims(draft, evidence)
+        model = self.answer_model or ExtractiveAnswerModel()
+        draft = await model.generate(message, evidence)
 
+        verification = verify_claims(draft, evidence)
         if not verification.grounded:
-            return self._abstain(conversation_id, route.intent, "Retrieved evidence could not be verified.")
+            return self._abstain(conversation_id, route.intent, "Draft answer failed grounding verification.")
 
         citations = [Citation.from_result(r).__dict__ for r in results]
         return {
