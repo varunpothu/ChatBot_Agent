@@ -28,7 +28,5 @@ class BrowserTranscriptProvider:
 
 class AmazonTranscribeProvider:
     def transcribe(self, audio: bytes, language: str) -> Transcript:
-        raise NotImplementedError(
-            "Amazon Transcribe adapter is intentionally isolated here. "
-            "Production wiring belongs in the infrastructure layer."
-        )
+        from voice.transcribe_streaming import AmazonTranscribeStreamingProvider
+        return AmazonTranscribeStreamingProvider().transcribe(audio, language)
