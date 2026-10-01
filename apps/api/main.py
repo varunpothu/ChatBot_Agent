@@ -162,7 +162,7 @@ async def dashboard():return FileResponse("web/dashboard.html")
 
 @app.get("/config")
 async def config():
-    return {"tts_mode":os.getenv("TTS_MODE","browser"),"llm_provider":os.getenv("LLM_PROVIDER","auto"),"translation_provider":os.getenv("TRANSLATION_PROVIDER","none"),"fast_path_default":True,"governed_ingestion":True,"runtime_backend":RUNTIME_BACKEND,"ingestion_mode":INGESTION_MODE,"distributed_cache":bool(REDIS_URL)}
+    return {"tts_mode":os.getenv("TTS_MODE","browser"),"llm_provider":os.getenv("LLM_PROVIDER","auto"),"translation_provider":os.getenv("TRANSLATION_PROVIDER","none"),"fast_path_default":True,"governed_ingestion":True,"runtime_backend":RUNTIME_BACKEND,"ingestion_mode":INGESTION_MODE,"distributed_cache":bool(REDIS_URL),"dynamic_polly_voice_discovery":os.getenv("POLLY_DYNAMIC_VOICE_DISCOVERY","false").lower()=="true"}
 
 @app.get("/languages")
 async def languages():
@@ -182,7 +182,15 @@ async def kpis():
     return {"kpis":snapshot,"alerts":[a.__dict__ for a in evaluate_alerts(snapshot)],"documents":{"total":sum(doc_counts.values()),"pending_review":doc_counts.get("PENDING_REVIEW",0),"active":doc_counts.get("ACTIVE",0),"by_status":doc_counts},"human_review_queue":{"open":len(ops.list_reviews("OPEN"))}}
 
 @app.get("/voices")
-async def voices():return [v.__dict__ for v in VOICES]
+async def voices():
+    if os.getenv("POLLY_DYNAMIC_VOICE_DISCOVERY","false").lower()=="true":
+        try:
+            dynamic=[v.__dict__ for v in AmazonPollyProvider().discover_voices()]
+            if dynamic:
+                return dynamic
+        except Exception:
+            pass
+    return [v.__dict__ for v in VOICES]
 
 @app.get("/voice-capabilities")
 async def voice_capabilities():return language_capabilities()
@@ -398,6 +406,16 @@ async def tts(request:TTSRequest):
     voice=matching[0];selected_voice=voice.voice_id
     if voice.language!=lang.code:
         replacement=available_polly_voice(lang.code,voice.gender)
+        if os.getenv("POLLY_DYNAMIC_VOICE_DISCOVERY","false").lower()=="true" and lang.polly_code:
+            try:
+                replacement=AmazonPollyProvider().resolve_voice(
+                    lang.polly_code,
+                    voice.gender,
+                    requested_voice_id=voice.voice_id,
+                    fallback_voice_id=replacement,
+                )
+            except Exception:
+                pass
         if replacement:selected_voice=replacement
         elif not lang.polly_code:raise HTTPException(503,"Cloud voice is not available for this language. Use browser voice output instead.")
     engine=os.getenv("POLLY_ENGINE","neural")
