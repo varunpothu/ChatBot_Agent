@@ -72,6 +72,7 @@ resource "aws_iam_policy" "app_task" {
       {
         Effect   = "Allow"
         Action   = [
+          "polly:DescribeVoices",
           "polly:SynthesizeSpeech",
           "transcribe:StartStreamTranscription"
         ]
