@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 import json
 import os
 import tempfile
+import time
 
 from knowledge.chunker import semantic_chunks
 from knowledge.parsers import parse_document
@@ -75,3 +77,30 @@ def run_once(body: str) -> int:
     )
     payload = json.loads(body)
     return IngestionWorker(runtime).process_message(payload)
+
+
+def main() -> None:
+    import boto3
+
+    queue_url=os.getenv("DOCUMENT_INGESTION_QUEUE_URL","")
+    if not queue_url:
+        raise RuntimeError("DOCUMENT_INGESTION_QUEUE_URL is required")
+    runtime=PostgresRuntime(os.getenv("DATABASE_URL",""),auto_init_schema=False)
+    worker=IngestionWorker(runtime)
+    sqs=boto3.client("sqs",region_name=os.getenv("AWS_REGION","eu-west-2"))
+    while True:
+        response=sqs.receive_message(
+            QueueUrl=queue_url,
+            MaxNumberOfMessages=5,
+            WaitTimeSeconds=20,
+            VisibilityTimeout=int(os.getenv("INGESTION_VISIBILITY_TIMEOUT_SECONDS","300")),
+        )
+        for message in response.get("Messages",[]):
+            try:
+                worker.process_message(json.loads(message["Body"]))
+            except Exception as exc:
+                worker.ops.audit("DOCUMENT_INGESTION_FAILED","ingestion-worker",None,{"error":str(exc),"message_id":message.get("MessageId")})
+            else:
+                sqs.delete_message(QueueUrl=queue_url,ReceiptHandle=message["ReceiptHandle"])
+        if not response.get("Messages"):
+            time.sleep(0.2)
