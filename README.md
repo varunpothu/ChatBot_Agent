@@ -70,6 +70,41 @@ Build the distribution smoke test with:
 
 The complete test matrix and release evidence requirements are documented in `docs/testing/TESTING.md` and `docs/release/RELEASE-CHECKLIST.md`.
 
+## Production deployment
+
+The repository includes a Terraform reference stack under `infra/terraform` and a manual OIDC-based GitHub Actions deployment workflow in `.github/workflows/deploy.yml`.
+
+Typical flow:
+
+    pytest -q -m "not integration"
+    python -m evaluation.ci_gate
+    python -m evaluation.benchmark
+    cd infra/terraform
+    terraform init
+    terraform plan -var='app_image=<ECR_IMAGE_URI>'
+
+The production workflow builds an immutable commit-SHA image, pushes it to ECR and applies the reviewed Terraform plan. GitHub recommends constraining the AWS OIDC trust policy with the repository/workflow subject and using a protected environment for deployments. citeturn832579search0turn832579search2
+
+## AI governance
+
+Model and prompt versions can be persisted in PostgreSQL. New records start in `PENDING_REVIEW`; activation requires an evaluation reference and archives the previous active version.
+
+Seed the initial records with:
+
+    coachai-db-init
+    python -m scripts.seed_governance
+
+Then review and activate the records through the admin governance API before enabling:
+
+    PROMPT_GOVERNANCE_REQUIRED=true
+    MODEL_GOVERNANCE_REQUIRED=true
+
+See `docs/governance/AI-CHANGE-CONTROL.md`.
+
+## Operations
+
+Terraform provisions CloudWatch alarms for ALB errors/latency, unhealthy targets, ingestion backlog/DLQ, RDS CPU and Redis CPU, plus an operations dashboard. ECR retains a bounded number of deployment images and an optional AWS monthly budget can be enabled.
+
 ## Run locally
 
 Create a virtual environment, install the package and start FastAPI:
