@@ -46,7 +46,7 @@ SQS is at-least-once, so ingestion must tolerate duplicates. Chunk inserts use O
 
 The PostgreSQL schema reserves a 512-dimensional pgvector column. The current managed embedding setting is aligned to Amazon Titan Text Embeddings V2 with a configurable 512-dimensional output. The local multilingual E5 profile remains available for cross-language evaluation and can be selected independently.
 
-The next production step is a dedicated embedding worker that writes the selected embedding into the persisted vector column. Until that is enabled, the API can still use the existing local retrieval profiles.
+The managed embedding worker is now integrated into the async ingestion path. The API's PostgreSQL retriever embeds the query with the same Titan configuration and performs vector retrieval directly in pgvector, with exact query-embedding caching when Redis is enabled.
 
 ## Failure handling
 
