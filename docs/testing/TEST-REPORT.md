@@ -34,12 +34,12 @@ This report covers the automated tests and production-test scaffolding added to 
 
 ### Verified in this environment
 
-- A real GitHub Actions AI Quality Gate completed successfully for commit b9b2691df45d882e151daf584aafda3430bef72e.
+- A real GitHub Actions AI Quality Gate completed successfully for commit 58623983d2fb4921e77149ed418f0bff5219388d.
 - Unit/quality job: passed, including deterministic retrieval/grounding gate, broader quality benchmark and compile/static checks.
 - PostgreSQL/Redis integration job: passed against GitHub-hosted PostgreSQL with pgvector and Redis service containers.
 - Terraform validation job: passed.
 - Package smoke-test job: passed.
-- The verified workflow run is https://github.com/varunpothu/ChatBot_Agent/actions/runs/36912758911.
+- The verified workflow run is https://github.com/varunpothu/ChatBot_Agent/actions/runs/36913070009.
 
 ### Not executed here
 
@@ -50,7 +50,7 @@ This report covers the automated tests and production-test scaffolding added to 
 
 ## Required next verification
 
-Run the CI workflow on the repository and record its run URL. Then perform the AWS smoke-test checklist in `docs/testing/TESTING.md` and attach the results to the release record in `docs/release/RELEASE-CHECKLIST.md`.
+The automated CI evidence is now recorded above. The remaining deployment-specific verification is the real AWS smoke-test checklist in `docs/testing/TESTING.md`.
 
 ## Important interpretation
 
