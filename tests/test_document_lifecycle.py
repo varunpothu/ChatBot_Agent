@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from knowledge.document_registry import InMemoryDocumentRegistry, ManagedDocument
-from rag.models import DocumentStatus
 
 def doc(registry, doc_id, name, version, status):
     item = ManagedDocument(
