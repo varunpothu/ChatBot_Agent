@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "coachai-rag"
-version = "1.1.0"
+version = "1.2.0"
 description = "Production-oriented, low-cost grounded RAG coaching-centre assistant with governed ingestion, multilingual retrieval, voice, evaluation and human oversight"
 requires-python = ">=3.11"
 dependencies = [
@@ -32,6 +32,9 @@ dependencies = [
 multilingual = [
   "sentence-transformers>=3,<6",
 ]
+
+[project.scripts]
+coachai-multilingual-benchmark = "scripts.benchmark_multilingual:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
