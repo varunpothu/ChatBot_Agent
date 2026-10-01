@@ -1,0 +1,20 @@
+name: AI Quality Gate
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install
+        run: pip install -e .
+      - name: Tests
+        run: pytest -q
+      - name: AI assurance checks
+        run: python -m compileall agents rag knowledge monitoring governance evaluation ai_controls
