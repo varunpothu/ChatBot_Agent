@@ -41,7 +41,8 @@ resource "aws_ecs_task_definition" "api" {
       { name = "BEDROCK_EMBEDDING_DIMENSIONS", value = "512" },
       { name = "OCR_PROVIDER", value = "textract" },
       { name = "TTS_MODE", value = "browser" },
-      { name = "AUTH_MODE", value = var.auth_mode }
+      { name = "AUTH_MODE", value = var.auth_mode },
+      { name = "POSTGRES_AUTO_INIT_SCHEMA", value = "true" }
     ]
     secrets = [
       { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
