@@ -7,12 +7,13 @@
 <body>
 <main class="shell">
 <header><div><h1>CoachAI</h1><p>Grounded coaching-centre assistant</p></div><span id="status">● Ready</span></header>
+<section class="voice-bar" aria-label="Conversation voice settings">
+<label>Voice<select id="voice"><option value="Brian">♂ British Male</option><option value="Amy">♀ British Female</option><option value="Matthew">♂ US Male</option><option value="Joanna">♀ US Female</option></select></label>
+<label>Speaking style<select id="style"><option value="friendly">Friendly</option><option value="professional">Professional</option><option value="concise">Concise</option></select></label>
+<label class="toggle"><input type="checkbox" id="autoSpeak"> Auto-speak</label>
+</section>
 <section id="chat" class="chat"></section>
-<form id="composer">
-<button type="button" id="mic" title="Voice input">🎙</button>
-<input id="message" autocomplete="off" placeholder="Ask about courses, fees, admissions or schedules..." required>
-<button>Send</button>
-</form>
+<form id="composer"><button type="button" id="mic" title="Voice input">🎙</button><input id="message" autocomplete="off" placeholder="Ask about courses, fees, admissions or schedules..." required><button>Send</button></form>
 <p class="note">Answers are generated only from approved knowledge sources. Unsupported questions are escalated instead of guessed.</p>
 </main>
 <script src="/web/app.js"></script>
