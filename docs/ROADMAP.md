@@ -48,7 +48,7 @@
 - AWS Translate adapter for multilingual retrieval/answer translation
 - Optional local multilingual E5 embeddings
 - Groq adapter remains optional
-- AWS Polly adapter
+- AWS Polly adapter with optional cached dynamic capability discovery
 - Amazon Transcribe streaming adapter with optional server-side /stt endpoint
 - PostgreSQL/pgvector durable runtime and database-native hybrid retrieval
 - S3/SQS/Textract/Transcribe/ECS/CloudWatch/Secrets Manager/IAM production service boundaries
