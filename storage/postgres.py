@@ -190,7 +190,7 @@ class PostgresDocumentRegistry:
                     ":status, :category, :owner, :source_uri, :created_at)"
                 ),
                 {
-                    "document_id": document.document_id,
+                    "document_id": _db_uuid(document.document_id),
                     "name": document.name,
                     "version": document.version,
                     "content_hash": document.content_hash,
@@ -224,7 +224,7 @@ class PostgresDocumentRegistry:
             uploaded_at=row["created_at"],
             approved_by=row["approved_by"],
         )
-        setattr(item, "source_uri", row["source_uri"])
+        item.source_uri = row["source_uri"]
         return item
 
     def list(self) -> list[ManagedDocument]:
@@ -247,7 +247,7 @@ class PostgresDocumentRegistry:
                 uploaded_at=row["created_at"],
                 approved_by=row["approved_by"],
             )
-            setattr(item, "source_uri", row["source_uri"])
+            item.source_uri = row["source_uri"]
             result.append(item)
         return result
 
@@ -265,7 +265,7 @@ class PostgresDocumentRegistry:
                     "SELECT name, status FROM documents "
                     "WHERE document_id = CAST(:document_id AS uuid) FOR UPDATE"
                 ),
-                {"document_id": document_id},
+                {"document_id": _db_uuid(document_id)},
             ).mappings().first()
             if target is None:
                 raise KeyError("Document not found")
@@ -307,7 +307,7 @@ class PostgresDocumentRegistry:
             )
             if not result.rowcount:
                 raise KeyError("Document not found")
-            self._bump_generation(conn)
+            conn.execute(text("UPDATE knowledge_state SET generation = generation + 1, updated_at = now() WHERE state_id = 1"))
 
     def reject(self, document_id: str, reviewer: str) -> None:
         with self.engine.begin() as conn:
