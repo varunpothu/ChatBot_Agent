@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,7 @@ from language.registry import get_language
 from knowledge.chunker import semantic_chunks
 from knowledge.document_registry import ManagedDocument, documents
 from knowledge.parsers import parse_document
+from knowledge.document_types import DocumentType, detect_type
 from monitoring.metrics import metrics
 from monitoring.alerts import evaluate_alerts
 from ops.runtime import ops
@@ -230,7 +231,7 @@ async def chat(request:Request,payload:ChatRequest):
 
 @app.post("/documents/upload")
 async def upload_document(file:UploadFile=File(...)):
-    suffix=Path(file.filename or "").suffix.lower();allowed={".pdf",".docx",".pptx",".xlsx",".xls",".csv",".txt",".md",".html",".htm",".json"}
+    suffix=Path(file.filename or "").suffix.lower();allowed={".pdf",".docx",".pptx",".xlsx",".xls",".csv",".txt",".md",".html",".htm",".json",".png",".jpg",".jpeg",".webp",".tiff"}
     if suffix not in allowed:raise HTTPException(415,f"Unsupported file type: {suffix or 'unknown'}")
     original_name=file.filename or f"document{suffix}";document_id=uuid4().hex;destination=UPLOAD_DIR/f"{document_id}{suffix}"
     content_hash=hashlib.sha256();total_bytes=0
@@ -269,6 +270,27 @@ async def upload_document(file:UploadFile=File(...)):
         raise
     except Exception as exc:
         destination.unlink(missing_ok=True);raise HTTPException(422,f"Document extraction failed: {exc}") from exc
+
+@app.post("/stt")
+async def stt(file:UploadFile=File(...),language:str=Form("en-GB")):
+    if os.getenv("STT_PROVIDER","browser").lower()!="transcribe":
+        raise HTTPException(503,"Server-side STT is disabled. Use browser speech recognition or set STT_PROVIDER=transcribe.")
+    try:
+        lang=get_language(language)
+    except ValueError:
+        raise HTTPException(400,"Unsupported language") from None
+    try:
+        from voice.transcribe_streaming import AmazonTranscribeStreamingProvider
+        audio=await file.read()
+        if not audio:
+            raise HTTPException(400,"Audio file is empty.")
+        result=await __import__("asyncio").to_thread(AmazonTranscribeStreamingProvider().transcribe,audio,lang.speech_code)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(503,f"Speech service unavailable: {exc}") from exc
+    metrics.record("stt")
+    return result.__dict__
 
 @app.post("/tts")
 async def tts(request:TTSRequest):
