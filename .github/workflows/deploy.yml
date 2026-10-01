@@ -1,0 +1,80 @@
+name: Deploy CoachAI
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: eu-west-2
+  TF_IN_AUTOMATION: true
+
+jobs:
+  deploy:
+    name: Build, test and deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python package
+        run: pip install -e .
+
+      - name: Unit and quality tests
+        run: pytest -q -m "not integration"
+
+      - name: Deterministic AI quality gate
+        run: python -m evaluation.ci_gate
+
+      - name: Compile
+        run: python -m compileall agents ai_controls apps dashboard evaluation governance infra knowledge language monitoring ops rag security storage translation voice workers
+
+      - name: Configure AWS credentials with OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          REPOSITORY: coachai
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build --pull -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" .
+          docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
+          echo "IMAGE=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_ENV"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: terraform init
+
+      - name: Terraform plan
+        working-directory: infra/terraform
+        env:
+          TF_VAR_app_image: ${{ env.IMAGE }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform apply
+        working-directory: infra/terraform
+        env:
+          TF_VAR_app_image: ${{ env.IMAGE }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Deployment summary
+        working-directory: infra/terraform
+        run: terraform output
