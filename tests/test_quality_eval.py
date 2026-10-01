@@ -2,7 +2,7 @@ from datetime import date
 
 from rag.models import DocumentChunk, DocumentMetadata
 from rag.retrieval import HybridRetriever
-from tests.quality_eval import TestCase, run_retrieval_tests
+from tests.quality_eval import TestCase as EvalCase, run_retrieval_tests
 
 
 def make_chunks():
@@ -34,7 +34,7 @@ def make_chunks():
 def test_golden_retrieval_covers_distinct_policy_facts():
     retriever = HybridRetriever(make_chunks())
     cases = [
-        TestCase("How much is the Data Science course?", ("£2800",)),
+        EvalCase("How much is the Data Science course?", ("£2800",)),
         EvalCase("How long do I have to request a refund?", ("14 days",)),
         EvalCase("What time does the evening batch start?", ("6pm",)),
     ]
