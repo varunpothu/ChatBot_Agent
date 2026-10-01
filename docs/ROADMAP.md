@@ -53,19 +53,19 @@
 - PostgreSQL/pgvector runtime backend is selected with DATABASE_URL.
 - Durable governed document registry, knowledge generation, audit events and human-review queue are available.
 - S3 immutable document source plus an SQS background ingestion path is available through INGESTION_MODE=aws_async.
+- Redis shared response/translation caching and an atomic distributed sliding-window request limiter are available through REDIS_URL.
 - The ingestion worker verifies the S3 SHA-256 manifest and uses SQS long polling with safe retry semantics.
 - Inline ingestion remains the default for local development.
 
 ## Still to integrate for a full production deployment
 
 1. AWS Textract for scanned/image documents and managed embedding workers.
-2. Distributed cache/rate limiting with Redis/ElastiCache or gateway controls.
-3. Amazon Transcribe streaming adapter for server-side voice.
-4. OIDC/IAM/API Gateway authentication instead of the development admin-key mechanism.
-5. Full model/prompt registry persistence and approval workflow.
-6. Larger golden evaluation suite covering retrieval, citations, faithfulness, multilingual translation quality, adversarial inputs, latency and cost.
-7. Terraform/IaC, deployment pipelines, CloudWatch SLOs and operational runbooks.
-8. Dynamic provider capability discovery for cloud voice selection.
+2. Amazon Transcribe streaming adapter for server-side voice.
+3. OIDC/IAM/API Gateway authentication instead of the development admin-key mechanism.
+4. Full model/prompt registry persistence and approval workflow.
+5. Larger golden evaluation suite covering retrieval, citations, faithfulness, multilingual translation quality, adversarial inputs, latency and cost.
+6. Terraform/IaC, deployment pipelines, CloudWatch SLOs and operational runbooks.
+7. Dynamic provider capability discovery for cloud voice selection.
 
 ## Scale target
 
