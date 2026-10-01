@@ -42,6 +42,13 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        run: terraform init
+
       - name: Bootstrap ECR
         working-directory: infra/terraform
         run: terraform apply -auto-approve -target=aws_ecr_repository.app -target=aws_ecr_lifecycle_policy.app
@@ -59,13 +66,6 @@ jobs:
           docker build --pull -t "$REGISTRY/$REPOSITORY:$IMAGE_TAG" .
           docker push "$REGISTRY/$REPOSITORY:$IMAGE_TAG"
           echo "IMAGE=$REGISTRY/$REPOSITORY:$IMAGE_TAG" >> "$GITHUB_ENV"
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform init
-        working-directory: infra/terraform
-        run: terraform init
 
       - name: Terraform plan
         working-directory: infra/terraform
