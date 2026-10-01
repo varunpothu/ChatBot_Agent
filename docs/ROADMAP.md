@@ -36,6 +36,11 @@
 - Audit events
 - Admin API-key protection
 - Deterministic retrieval and grounding quality gates in CI configuration
+- Broader golden evaluation and reproducible quality benchmark
+- Terraform infrastructure-as-code reference stack
+- Manual OIDC-based deployment workflow
+- CloudWatch operations alarms/dashboard and optional AWS budget guardrail
+- Persistent model/prompt registry with evaluation-required activation
 
 ### AI and AWS provider boundaries
 - Bedrock Nova Micro adapter for low-cost synthesis
@@ -59,11 +64,10 @@
 
 ## Still to integrate for a full production deployment
 
-1. OIDC/IAM/API Gateway authentication instead of the development admin-key mechanism.
-2. Full model/prompt registry persistence and approval workflow.
-3. Larger golden evaluation suite covering retrieval, citations, faithfulness, multilingual translation quality, adversarial inputs, latency and cost.
-4. Terraform/IaC, deployment pipelines, CloudWatch SLOs and operational runbooks.
-5. Dynamic provider capability discovery for cloud voice selection.
+1. Finalize OIDC/API Gateway claim mapping and remove the development admin-key dependency from public operations.
+2. Persist conversation turns and structured user preferences in PostgreSQL.
+3. Expand the golden corpus with real centre documents, multilingual translated queries and adversarial evaluation sets.
+4. Dynamic provider capability discovery for cloud voice selection.
 
 ## Scale target
 
