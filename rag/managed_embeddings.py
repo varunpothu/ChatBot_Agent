@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from functools import lru_cache
@@ -66,3 +67,43 @@ class BedrockTitanEmbeddingProvider:
 @lru_cache(maxsize=4)
 def build_bedrock_embedding_provider() -> BedrockTitanEmbeddingProvider:
     return BedrockTitanEmbeddingProvider()
+
+
+class CachedEmbeddingProvider:
+    """Exact-content embedding cache around a managed embedding provider."""
+
+    def __init__(self, provider, cache=None):
+        self.provider = provider
+        self.cache = cache
+        self.model_id = provider.model_id
+        self.dimensions = provider.dimensions
+
+    def _key(self, text: str) -> str:
+        digest = hashlib.sha256(text.strip().encode("utf-8")).hexdigest()
+        if self.cache is None:
+            return digest
+        return self.cache.key(
+            "document-embedding",
+            self.model_id,
+            str(self.dimensions),
+            digest,
+        )
+
+    def embed_one(self, text: str) -> list[float]:
+        value = text.strip()
+        if not value:
+            return []
+        if self.cache is not None:
+            cached = self.cache.get(self._key(value))
+            if cached is not None:
+                return [float(item) for item in cached]
+        vector = self.provider.embed_one(value)
+        if self.cache is not None and vector:
+            self.cache.set(self._key(value), vector)
+        return vector
+
+    def embed(self, texts: list[str]) -> list[list[float]]:
+        return [self.embed_one(text) for text in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        return self.embed_one(text)
