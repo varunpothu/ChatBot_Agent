@@ -17,8 +17,10 @@ class Metrics:
     total_latency_ms: float = 0
 
     def record(self, event: str, latency_ms: float = 0, **usage):
-        self.requests += 1
-        self.total_latency_ms += latency_ms
+        # Only a completed answer/abstention represents a real user request.
+        if event in {"answer", "abstention"}:
+            self.requests += 1
+            self.total_latency_ms += latency_ms
         if event == "answer": self.successful_answers += 1
         if event == "abstention": self.abstentions += 1
         if event == "human_escalation": self.human_escalations += 1
