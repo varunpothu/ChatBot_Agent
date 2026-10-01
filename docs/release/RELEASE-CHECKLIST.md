@@ -31,3 +31,10 @@
 Record the commit SHA, CI workflow URL, test totals, skipped tests, quality-gate output, production smoke-test date, representative latency, estimated cost per 1,000 chats, and any known limitations.
 
 Do not label the deployment production-ready until the evidence above has actually been collected.
+## Verified automated gates
+
+AI Quality Gate: https://github.com/varunpothu/ChatBot_Agent/actions/runs/36912758911
+
+Commit: b9b2691df45d882e151daf584aafda3430bef72e
+
+Unit/quality, PostgreSQL/Redis integration, Terraform validation and package build all completed successfully.
