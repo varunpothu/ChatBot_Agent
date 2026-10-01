@@ -38,6 +38,9 @@ class IngestionWorker:
         with tempfile.TemporaryDirectory() as temp_dir:
             destination = Path(temp_dir) / f"{document_id}{suffix}"
             s3.download_file(bucket, key, str(destination))
+            digest=hashlib.sha256(destination.read_bytes()).hexdigest()
+            if digest != payload["content_hash"]:
+                raise ValueError("S3 object hash does not match the upload manifest")
             normalized = parse_document(destination)
             chunks = semantic_chunks(normalized)
             metadata = self.documents.get(document_id)
@@ -60,7 +63,6 @@ class IngestionWorker:
             ]
             self.store.add(converted)
             self.documents.set_status(document_id, "PENDING_REVIEW")
-            self.store.set_document_status(document_id, DocumentStatus.PENDING_REVIEW)
             event = self.ops.audit(
                 "DOCUMENT_INGESTION_COMPLETED",
                 "ingestion-worker",
