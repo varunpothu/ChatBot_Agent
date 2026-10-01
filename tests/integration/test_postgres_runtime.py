@@ -5,6 +5,7 @@ import pytest
 
 from knowledge.document_registry import ManagedDocument
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
+from rag.retrieval import PostgresHybridRetriever
 from storage.postgres import PostgresRuntime
 
 pytestmark = pytest.mark.integration
@@ -50,4 +51,52 @@ def test_postgres_runtime_persists_document_chunk_and_generation():
 
     registry.activate(doc_id, "integration-test")
     assert registry.get(doc_id).status == "ACTIVE"
+    runtime.engine.dispose()
+
+
+class FakeQueryEmbeddingProvider:
+    model_id = "integration-fake"
+    dimensions = 512
+
+    def embed_query(self, _text):
+        return [1.0] + [0.0] * 511
+
+
+def test_postgres_vector_retrieval_hits_persisted_embedding():
+    runtime = get_runtime()
+    registry = runtime.document_registry()
+    name = "Integration-Retrieval.pdf"
+    doc_id = "integration-retrieval-doc-001"
+    doc = ManagedDocument(
+        doc_id,
+        name,
+        registry.next_version(name),
+        "integration-hash-002",
+        "general",
+        "PENDING_REVIEW",
+        datetime.now(timezone.utc),
+    )
+    registry.add(doc)
+
+    store = runtime.knowledge_store()
+    chunk = DocumentChunk(
+        f"{doc_id}-chunk-1",
+        DocumentMetadata(doc_id, name, doc.version, "general", DocumentStatus.PENDING_REVIEW),
+        1,
+        "Refunds",
+        "Refund requests must be submitted within 14 days.",
+        [1.0] + [0.0] * 511,
+    )
+    store.add([chunk])
+    registry.activate(doc_id, "integration-test")
+
+    retriever = PostgresHybridRetriever(
+        store,
+        embedding_provider=FakeQueryEmbeddingProvider(),
+    )
+    results = retriever.search("refund requests", top_k=1)
+
+    assert len(results) == 1
+    assert results[0].chunk.text.startswith("Refund requests")
+    assert results[0].semantic_score > 0.99
     runtime.engine.dispose()
