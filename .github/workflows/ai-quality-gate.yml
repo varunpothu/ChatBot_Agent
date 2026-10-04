@@ -110,3 +110,11 @@ jobs:
       - name: Terraform validate
         working-directory: infra/terraform
         run: terraform validate
+
+  container-smoke:
+    name: Container build smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build container
+        run: docker build --pull -t coachai-ci:${{ github.sha }} .
