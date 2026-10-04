@@ -41,3 +41,16 @@ Defaults are deliberately small: one API task, one ingestion worker, one DB inst
     terraform apply -var='app_image=<ECR_IMAGE_URI>'
 
 Review the variables and identity architecture before applying. Enable deletion protection and backup/restore procedures appropriate to the real environment.
+
+## Variables example
+
+Copy `terraform.tfvars.example` to an untracked `terraform.tfvars` and replace the placeholder values. Never commit credentials, real tokens or production secrets into Terraform files.
+
+The deployment workflow expects GitHub Environment secrets for:
+- `AWS_ROLE_ARN`
+- `OIDC_ISSUER_URL`
+- `OIDC_AUDIENCE`
+- `CERTIFICATE_ARN`
+- `BUDGET_ALERT_EMAIL`
+
+The OIDC issuer and audience must match the identity provider used by the application. Supply a real ACM certificate before public production exposure.
