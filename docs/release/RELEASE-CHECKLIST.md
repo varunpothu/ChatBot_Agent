@@ -7,6 +7,7 @@
 - [ ] PostgreSQL/Redis integration suite passes with `pytest -m integration -q` on the current release commit.
 - [ ] Compile/static smoke test passes on the current release commit.
 - [ ] Package build passes on the current release commit.
+- [ ] Docker container build passes on the current release commit.
 
 ## AWS evidence
 
