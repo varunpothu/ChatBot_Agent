@@ -56,4 +56,4 @@ The API still has deterministic local fallbacks for answer generation when the c
 
 ## Required production services
 
-PostgreSQL/pgvector, Redis/ElastiCache, S3, SQS and the API worker runtime are the current shared-service layer. Textract, Transcribe streaming, identity federation, Terraform and full SLO/runbook automation remain separate deployment milestones.
+PostgreSQL/pgvector, Redis/ElastiCache, S3, SQS, Textract, Transcribe streaming and the ECS/Terraform runtime are now represented in the repository. Final account-specific identity mapping, operational SLO/runbook configuration and restore drills remain deployment milestones.
