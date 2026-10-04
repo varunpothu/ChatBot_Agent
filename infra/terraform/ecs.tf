@@ -49,6 +49,8 @@ resource "aws_ecs_task_definition" "api" {
       { name = "AUTH_MODE", value = var.auth_mode },
       { name = "OIDC_ISSUER_URL", value = var.oidc_issuer_url },
       { name = "OIDC_AUDIENCE", value = join(",", var.oidc_audience) },
+      { name = "OIDC_ISSUER_URL", value = var.oidc_issuer_url },
+      { name = "OIDC_AUDIENCE", value = join(",", var.oidc_audience) },
       { name = "POSTGRES_AUTO_INIT_SCHEMA", value = "false" }
     ]
     secrets = [
