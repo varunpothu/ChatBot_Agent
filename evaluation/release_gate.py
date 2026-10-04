@@ -17,4 +17,6 @@ def evaluate_release(kpis: dict, retrieval_recall: float, citation_accuracy: flo
         reasons.append("latency above 3000ms")
     if kpis.get("abstention_check") is False:
         reasons.append("unsupported-question abstention check failed")
+    if kpis.get("security_check") is False:
+        reasons.append("adversarial security check failed")
     return ReleaseGate(not reasons, reasons)
