@@ -5,12 +5,60 @@ import os
 
 from fastapi import HTTPException, Request
 
+try:
+    import jwt
+except ImportError:
+    jwt = None
+
 
 @dataclass(frozen=True)
 class Principal:
     user_id: str
     role: str = "student"
 
+
+
+class OIDCValidator:
+    """RS256 OIDC access-token validation with short-lived JWKS refresh."""
+
+    def __init__(self, issuer_url: str, audience: list[str], ttl_seconds: int = 900):
+        self.issuer_url = issuer_url.rstrip("/")
+        self.audience = audience
+        self.ttl_seconds = ttl_seconds
+        self._jwks_client = None
+
+    def _client(self):
+        if jwt is None:
+            raise RuntimeError("PyJWT is required for AUTH_MODE=oidc.")
+        if self._jwks_client is None:
+            self._jwks_client = jwt.PyJWKClient(
+                f"{self.issuer_url}/.well-known/jwks.json",
+                cache_jwk_set=True,
+                lifespan=self.ttl_seconds,
+            )
+        return self._jwks_client
+
+    def validate(self, token: str) -> Principal:
+        if jwt is None:
+            raise HTTPException(503, "OIDC support is not installed.")
+        try:
+            signing_key = self._client().get_signing_key_from_jwt(token).key
+            claims = jwt.decode(
+                token,
+                signing_key,
+                algorithms=["RS256"],
+                audience=self.audience or None,
+                issuer=self.issuer_url,
+                options={"require": ["sub", "iss", "exp"]},
+            )
+            role = str(claims.get("custom:role") or claims.get("role") or "student")
+            if role not in {"student", "admin"}:
+                raise HTTPException(403, "Unsupported user role.")
+            return Principal(user_id=str(claims["sub"]), role=role)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(401, f"Invalid OIDC access token: {exc}") from exc
 
 def require_principal(request: Request) -> Principal:
     mode = os.getenv("AUTH_MODE", "development").lower()
@@ -33,4 +81,13 @@ def require_principal(request: Request) -> Principal:
             raise HTTPException(403, "Unsupported user role.")
         return Principal(user_id=user_id, role=role)
 
-    raise HTTPException(503, "Unsupported AUTH_MODE configuration.")
+
+    raise HTTPException(503, "Unsupported AUTH_MODE configuration.")        authorization = request.headers.get("authorization", "")
+        if not authorization.lower().startswith("bearer "):
+            raise HTTPException(401, "Bearer access token is required.")
+        issuer = os.getenv("OIDC_ISSUER_URL", "").strip()
+        audience = [item.strip() for item in os.getenv("OIDC_AUDIENCE", "").split(",") if item.strip()]
+        if not issuer:
+            raise HTTPException(503, "OIDC_ISSUER_URL is not configured.")
+        return OIDCValidator(issuer, audience).validate(authorization.split(" ", 1)[1].strip())
+
