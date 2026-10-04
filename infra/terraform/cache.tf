@@ -31,16 +31,3 @@ resource "aws_secretsmanager_secret_version" "redis_url" {
   secret_string = "rediss://:${random_password.redis.result}@${aws_elasticache_replication_group.main.primary_endpoint_address}:6379/0"
 }
 
-resource "aws_secretsmanager_secret" "admin_key" {
-  name = "${var.project_name}/admin-api-key"
-}
-
-resource "random_password" "admin" {
-  length  = 40
-  special = false
-}
-
-resource "aws_secretsmanager_secret_version" "admin_key" {
-  secret_id     = aws_secretsmanager_secret.admin_key.id
-  secret_string = random_password.admin.result
-}
