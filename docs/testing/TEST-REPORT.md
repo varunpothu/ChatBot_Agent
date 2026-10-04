@@ -43,8 +43,10 @@ This report covers the automated tests and production-test scaffolding added to 
 
 ### Current-head verification status
 
+- Current head at the time of this report: f0f2773cf586cf3f9f439cc06aed683e86e0ffce.
 - The current head contains additional infrastructure, authentication, conversation-persistence and test changes after the verified baseline commit.
-- Those newer changes require a fresh GitHub Actions run before the current head can be marked verified.
+- Those newer changes require a fresh GitHub Actions run before the current head can be marked fully CI-verified.
+- Independent Python syntax compilation was also performed for the current authentication, benchmark and persistent-memory modules and passed.
 
 ### Not executed here
 
