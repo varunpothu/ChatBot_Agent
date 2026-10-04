@@ -2,11 +2,11 @@
 
 ## Automated evidence
 
-- [x] Unit suite passes with `pytest -q -m "not integration"`.
-- [x] Deterministic quality gate passes with `python -m evaluation.ci_gate`.
-- [x] PostgreSQL/Redis integration suite passes with `pytest -m integration -q`.
-- [x] Compile/static smoke test passes.
-- [x] Package build passes.
+- [ ] Unit suite passes with `pytest -q -m "not integration"` on the current release commit.
+- [ ] Deterministic quality gate passes with `python -m evaluation.ci_gate` on the current release commit.
+- [ ] PostgreSQL/Redis integration suite passes with `pytest -m integration -q` on the current release commit.
+- [ ] Compile/static smoke test passes on the current release commit.
+- [ ] Package build passes on the current release commit.
 
 ## AWS evidence
 
@@ -47,3 +47,8 @@ AI Quality Gate: https://github.com/varunpothu/ChatBot_Agent/actions/runs/369134
 Commit: d36c7c5a969bb5c84be5479ea4914c3a65447fb5
 
 56 unit tests passed, 4 integration tests passed, Terraform validation passed, package build passed, and the deterministic quality benchmark passed. AWS account-specific smoke tests remain deployment-specific.
+
+
+## Baseline evidence
+
+The earlier commit d36c7c5a969bb5c84be5479ea4914c3a65447fb5 has documented successful CI evidence. Because the repository has changed since then, the automated gates above should be re-checked against the final release SHA.
