@@ -71,12 +71,20 @@ jobs:
         working-directory: infra/terraform
         env:
           TF_VAR_app_image: ${{ env.IMAGE }}
+          TF_VAR_oidc_issuer_url: ${{ secrets.OIDC_ISSUER_URL }}
+          TF_VAR_oidc_audience: ${{ secrets.OIDC_AUDIENCE }}
+          TF_VAR_certificate_arn: ${{ secrets.CERTIFICATE_ARN }}
+          TF_VAR_budget_alert_email: ${{ secrets.BUDGET_ALERT_EMAIL }}
         run: terraform plan -out=tfplan
 
       - name: Terraform apply
         working-directory: infra/terraform
         env:
           TF_VAR_app_image: ${{ env.IMAGE }}
+          TF_VAR_oidc_issuer_url: ${{ secrets.OIDC_ISSUER_URL }}
+          TF_VAR_oidc_audience: ${{ secrets.OIDC_AUDIENCE }}
+          TF_VAR_certificate_arn: ${{ secrets.CERTIFICATE_ARN }}
+          TF_VAR_budget_alert_email: ${{ secrets.BUDGET_ALERT_EMAIL }}
         run: terraform apply -auto-approve tfplan
 
       - name: Deployment summary
