@@ -1,0 +1,16 @@
+project_name              = "coachai"
+aws_region                 = "eu-west-2"
+app_image                  = "ACCOUNT.dkr.ecr.eu-west-2.amazonaws.com/coachai:TAG"
+api_desired_count          = 1
+worker_desired_count       = 1
+db_instance_class          = "db.t4g.micro"
+redis_node_type            = "cache.t4g.micro"
+db_name                    = "coachai"
+bedrock_model_id           = "amazon.nova-micro-v1:0"
+bedrock_embedding_model_id = "amazon.titan-embed-text-v2:0"
+auth_mode                  = "oidc"
+oidc_issuer_url            = "https://your-issuer.example.com"
+oidc_audience              = ["coachai"]
+certificate_arn            = "arn:aws:acm:eu-west-2:ACCOUNT:certificate/REPLACE_ME"
+monthly_budget_usd         = 50
+budget_alert_email        = "alerts@example.com"
