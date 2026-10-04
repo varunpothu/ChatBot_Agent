@@ -17,14 +17,13 @@ class Principal:
     role: str = "student"
 
 
-
 class OIDCValidator:
-    """RS256 OIDC access-token validation with short-lived JWKS refresh."""
+    """Validate RS256 bearer tokens against a configured OIDC issuer."""
 
-    def __init__(self, issuer_url: str, audience: list[str], ttl_seconds: int = 900):
+    def __init__(self, issuer_url: str, audience: list[str], cache_ttl_seconds: int = 900):
         self.issuer_url = issuer_url.rstrip("/")
         self.audience = audience
-        self.ttl_seconds = ttl_seconds
+        self.cache_ttl_seconds = cache_ttl_seconds
         self._jwks_client = None
 
     def _client(self):
@@ -34,7 +33,7 @@ class OIDCValidator:
             self._jwks_client = jwt.PyJWKClient(
                 f"{self.issuer_url}/.well-known/jwks.json",
                 cache_jwk_set=True,
-                lifespan=self.ttl_seconds,
+                lifespan=self.cache_ttl_seconds,
             )
         return self._jwks_client
 
@@ -60,8 +59,10 @@ class OIDCValidator:
         except Exception as exc:
             raise HTTPException(401, f"Invalid OIDC access token: {exc}") from exc
 
+
 def require_principal(request: Request) -> Principal:
     mode = os.getenv("AUTH_MODE", "development").lower()
+
     if mode == "development":
         return Principal(
             user_id=request.headers.get("x-coachai-user-id", "local-user"),
@@ -69,8 +70,6 @@ def require_principal(request: Request) -> Principal:
         )
 
     if mode == "api_gateway":
-        # API Gateway/ALB must authenticate upstream and overwrite these
-        # headers so clients cannot supply their own identity.
         user_id = request.headers.get("x-coachai-user-id") or request.headers.get(
             "x-amzn-oidc-identity"
         )
@@ -81,13 +80,17 @@ def require_principal(request: Request) -> Principal:
             raise HTTPException(403, "Unsupported user role.")
         return Principal(user_id=user_id, role=role)
 
-
-    raise HTTPException(503, "Unsupported AUTH_MODE configuration.")        authorization = request.headers.get("authorization", "")
+    if mode == "oidc":
+        authorization = request.headers.get("authorization", "")
         if not authorization.lower().startswith("bearer "):
             raise HTTPException(401, "Bearer access token is required.")
         issuer = os.getenv("OIDC_ISSUER_URL", "").strip()
         audience = [item.strip() for item in os.getenv("OIDC_AUDIENCE", "").split(",") if item.strip()]
         if not issuer:
             raise HTTPException(503, "OIDC_ISSUER_URL is not configured.")
-        return OIDCValidator(issuer, audience).validate(authorization.split(" ", 1)[1].strip())
+        token = authorization.split(" ", 1)[1].strip()
+        if not token:
+            raise HTTPException(401, "Bearer access token is empty.")
+        return OIDCValidator(issuer, audience).validate(token)
 
+    raise HTTPException(503, "Unsupported AUTH_MODE configuration.")
