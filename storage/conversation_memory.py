@@ -73,3 +73,41 @@ class PostgresConversationMemory:
                     "updated_at": now,
                 },
             )
+
+
+    def record_turn(
+        self,
+        conversation_id: str,
+        user_text: str,
+        assistant_text: str,
+        grounded: bool,
+        citations_count: int,
+        latency_ms: float,
+        model_id: str | None = None,
+    ) -> None:
+        from sqlalchemy import text
+        turn_id = uuid5(
+            NAMESPACE_URL,
+            f"{conversation_id}:{datetime.now(timezone.utc).timestamp()}:{user_text[:64]}",
+        )
+        with self.engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO conversation_turns "
+                    "(turn_id, conversation_id, user_text, assistant_text, grounded, "
+                    "citations_count, latency_ms, model_id) "
+                    "VALUES (CAST(:turn_id AS uuid), CAST(:conversation_id AS uuid), "
+                    ":user_text, :assistant_text, :grounded, :citations_count, "
+                    ":latency_ms, :model_id)"
+                ),
+                {
+                    "turn_id": str(turn_id),
+                    "conversation_id": _db_uuid(conversation_id),
+                    "user_text": user_text[:2000],
+                    "assistant_text": assistant_text[:4000],
+                    "grounded": grounded,
+                    "citations_count": citations_count,
+                    "latency_ms": latency_ms,
+                    "model_id": model_id,
+                },
+            )
