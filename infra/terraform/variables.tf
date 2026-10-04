@@ -85,3 +85,16 @@ variable "budget_alert_email" {
   default     = ""
   description = "Optional email for AWS Budget notifications. Leave empty to disable."
 }
+
+
+variable "oidc_issuer_url" {
+  type        = string
+  default     = ""
+  description = "OIDC issuer URL used by AUTH_MODE=oidc."
+}
+
+variable "oidc_audience" {
+  type        = list(string)
+  default     = []
+  description = "Accepted JWT audience values."
+}
