@@ -1,6 +1,3 @@
-from storage.conversation_memory import PostgresConversationMemory
-
-
 class Result:
     def __init__(self, value):
         self.value = value
@@ -32,10 +29,14 @@ class Engine:
 
 
 def test_follow_up_resolution_uses_previous_query_only():
+    from storage.conversation_memory import PostgresConversationMemory
+
     store = PostgresConversationMemory(Engine("What is the course fee?"))
     assert store.resolve("conversation-1", "And when is it due?") == "What is the course fee? And when is it due?"
 
 
 def test_normal_question_is_not_prefixed():
+    from storage.conversation_memory import PostgresConversationMemory
+
     store = PostgresConversationMemory(Engine("What is the course fee?"))
     assert store.resolve("conversation-1", "What documents do I need?") == "What documents do I need?"
