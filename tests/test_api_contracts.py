@@ -79,3 +79,20 @@ async def test_chat_without_knowledge_abstains():
     body = response.json()
     assert body["abstained"] is True
     assert body["next_action"] == "human_review"
+
+
+def test_admin_operations_require_configured_credentials():
+    import os
+    from starlette.testclient import TestClient
+    from apps.api.main import app
+
+    previous = os.environ.get("ADMIN_API_KEY")
+    os.environ["ADMIN_API_KEY"] = ""
+    try:
+        response = TestClient(app).get("/documents")
+        assert response.status_code == 503
+    finally:
+        if previous is None:
+            os.environ.pop("ADMIN_API_KEY", None)
+        else:
+            os.environ["ADMIN_API_KEY"] = previous
