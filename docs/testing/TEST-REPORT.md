@@ -32,7 +32,7 @@ This report covers the automated tests and production-test scaffolding added to 
 
 ## Execution status
 
-### Verified in this environment
+### Previously verified baseline
 
 - A real GitHub Actions AI Quality Gate completed successfully for commit d36c7c5a969bb5c84be5479ea4914c3a65447fb5.
 - Unit/quality job: passed, including deterministic retrieval/grounding gate, broader quality benchmark and compile/static checks.
@@ -40,6 +40,11 @@ This report covers the automated tests and production-test scaffolding added to 
 - Terraform validation job: passed.
 - Package smoke-test job: passed.
 - The verified workflow run is https://github.com/varunpothu/ChatBot_Agent/actions/runs/36913480280.
+
+### Current-head verification status
+
+- The current head contains additional infrastructure, authentication, conversation-persistence and test changes after the verified baseline commit.
+- Those newer changes require a fresh GitHub Actions run before the current head can be marked verified.
 
 ### Not executed here
 
