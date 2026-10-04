@@ -64,10 +64,10 @@
 
 ## Still to integrate for a full production deployment
 
-1. Finalize OIDC/API Gateway claim mapping and remove the development admin-key dependency from public operations.
-2. Persist conversation turns and structured user preferences in PostgreSQL.
-3. Expand the golden corpus with real centre documents, multilingual translated queries and adversarial evaluation sets.
-4. Dynamic provider capability discovery for cloud voice selection.
+1. Replace the development admin-key operations control with the final production identity/role mapping.
+2. Expand the golden corpus with real centre documents, multilingual translated queries and adversarial evaluation sets.
+3. Add formal retention/deletion controls for persisted conversation records.
+4. Add full deployment SLO dashboards, incident runbooks and restore drills in the target AWS account.
 
 ## Scale target
 
