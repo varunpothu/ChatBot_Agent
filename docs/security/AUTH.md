@@ -29,3 +29,5 @@ Only use this mode when untrusted clients cannot bypass the trusted ingress and 
 ## Operations
 
 Document ingestion, governance endpoints, KPI data and audit access remain protected by the admin control. Replace the development admin-key mechanism with the final production identity/role mapping before broad public operations access.
+
+In OIDC or API-Gateway mode, admin operations require the validated principal to have the `admin` role. A shared production admin API key is not required.
