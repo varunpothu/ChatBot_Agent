@@ -65,7 +65,7 @@ variable "bedrock_embedding_model_id" {
 
 variable "auth_mode" {
   type    = string
-  default = "api_gateway"
+  default = "oidc"
 }
 
 variable "certificate_arn" {
