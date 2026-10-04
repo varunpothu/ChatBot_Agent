@@ -56,7 +56,6 @@ resource "aws_ecs_task_definition" "api" {
     secrets = [
       { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
       { name = "REDIS_URL", valueFrom = aws_secretsmanager_secret.redis_url.arn },
-      { name = "ADMIN_API_KEY", valueFrom = aws_secretsmanager_secret.admin_key.arn }
     ]
     logConfiguration = {
       logDriver = "awslogs"
