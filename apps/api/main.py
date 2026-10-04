@@ -149,10 +149,22 @@ class GovernanceApproval(BaseModel):
     reviewer:str=Field(min_length=1,max_length=120)
     evaluation_reference:str=Field(min_length=1,max_length=500)
 
-def require_admin(x_admin_key:str|None=Header(default=None))->None:
-    expected=os.getenv("ADMIN_API_KEY","")
-    if not expected:raise HTTPException(503,"Admin API is not configured.")
-    if x_admin_key!=expected:raise HTTPException(401,"Invalid admin credentials.")
+def require_admin(
+    request: Request,
+    x_admin_key: str | None = Header(default=None),
+) -> None:
+    mode = os.getenv("AUTH_MODE", "development").lower()
+    if mode in {"oidc", "api_gateway"}:
+        principal = require_principal(request)
+        if principal.role != "admin":
+            raise HTTPException(403, "Administrator role is required.")
+        return
+
+    expected = os.getenv("ADMIN_API_KEY", "")
+    if not expected:
+        raise HTTPException(503, "Admin API is not configured.")
+    if x_admin_key != expected:
+        raise HTTPException(401, "Invalid admin credentials.")
 
 @app.get("/")
 async def home():return FileResponse("web/index.html")
