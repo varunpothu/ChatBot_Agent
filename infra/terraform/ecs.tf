@@ -47,7 +47,9 @@ resource "aws_ecs_task_definition" "api" {
       { name = "OCR_PROVIDER", value = "textract" },
       { name = "TTS_MODE", value = "browser" },
       { name = "AUTH_MODE", value = var.auth_mode },
-      { name = "POSTGRES_AUTO_INIT_SCHEMA", value = "true" }
+      { name = "OIDC_ISSUER_URL", value = var.oidc_issuer_url },
+      { name = "OIDC_AUDIENCE", value = join(",", var.oidc_audience) },
+      { name = "POSTGRES_AUTO_INIT_SCHEMA", value = "false" }
     ]
     secrets = [
       { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
