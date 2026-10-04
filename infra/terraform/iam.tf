@@ -52,7 +52,6 @@ resource "aws_iam_policy" "app_task" {
         Resource = [
           aws_secretsmanager_secret.database_url.arn,
           aws_secretsmanager_secret.redis_url.arn,
-          aws_secretsmanager_secret.admin_key.arn
         ]
       },
       {
