@@ -35,6 +35,11 @@ jobs:
 
       - name: Compile
         run: python -m compileall agents ai_controls apps dashboard evaluation governance infra knowledge language monitoring ops rag security storage translation voice workers
+      - name: Validate Terraform configuration
+        working-directory: infra/terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
 
       - name: Configure AWS credentials with OIDC
         uses: aws-actions/configure-aws-credentials@v4
