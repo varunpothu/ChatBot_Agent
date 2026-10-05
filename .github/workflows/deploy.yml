@@ -108,6 +108,8 @@ jobs:
 
       - name: Bootstrap ECR
         working-directory: infra/terraform
+        env:
+          TF_VAR_app_image: "bootstrap"
         run: terraform apply -auto-approve -target=aws_ecr_repository.app -target=aws_ecr_lifecycle_policy.app
 
       - name: Login to ECR
