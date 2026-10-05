@@ -23,6 +23,9 @@
 - Optional cached Amazon Polly TTS
 - Runtime LLM, translation, voice, token and latency telemetry
 - Multilingual retrieval benchmark command for real-corpus evaluation
+- Measurable multilingual retrieval benchmark with Recall@1/Recall@K, MRR, NDCG@K and p50/p95 latency
+- Conversation privacy controls and configurable retention cleanup
+- Separate API and ingestion-worker IAM boundaries
 
 ### Knowledge and safety
 - PDF, DOCX, PPTX, XLS/XLSX, CSV, TXT, Markdown, HTML and JSON ingestion
