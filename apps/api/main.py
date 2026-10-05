@@ -301,13 +301,14 @@ async def audit():
         return [e.__dict__ for e in ops.list_audit(200)]
     return [e.__dict__ for e in reversed(ops.audit_events[-200:])]
 
-def authenticate_and_rate_limit(request: Request, scope: str) -> None:
+def authenticate_and_rate_limit(request: Request, scope: str):
     principal=require_principal(request)
     client_ip=request.client.host if request.client else "unknown"
     client_key=f"{scope}:{principal.user_id}:{client_ip}"
     if not rate_limiter.allow(client_key):
         metrics.record("rate_limit_block")
         raise HTTPException(429,"Too many requests. Please try again shortly.",headers={"Retry-After":"60"})
+    return principal
 
 
 def get_retriever()->HybridRetriever|PostgresHybridRetriever:
@@ -322,8 +323,7 @@ def get_retriever()->HybridRetriever|PostgresHybridRetriever:
 
 @app.post("/chat")
 async def chat(request:Request,payload:ChatRequest):
-    principal=require_principal(request)
-    authenticate_and_rate_limit(request,"chat")
+    principal=authenticate_and_rate_limit(request,"chat")
     started=time.perf_counter()
     if payload.language!="auto":
         try:get_language(payload.language)
