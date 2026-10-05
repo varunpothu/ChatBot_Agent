@@ -31,13 +31,13 @@ class Pricing:
 
 
 CASES = (
-    ("fast_fact", "What is the course fee?", "en-GB", 0),
-    ("fast_fact", "What documents do I need to apply?", "en-GB", 0),
-    ("fast_fact", "When does the evening batch start?", "en-GB", 0),
-    ("deep_explanation", "Can you explain the difference between the weekday and evening options and recommend one?", "en-GB", 1),
-    ("follow_up", "Is that fee refundable?", "en-GB", 1),
-    ("multilingual", "कोर्स की फीस कितनी है?", "hi-IN", 1),
-    ("human_review", "I want to speak to a human manager.", "en-GB", 0),
+    ("fast_fact", "What is the course fee?", "en-GB"),
+    ("fast_fact", "What documents do I need to apply?", "en-GB"),
+    ("fast_fact", "When does the evening batch start?", "en-GB"),
+    ("deep_explanation", "Can you explain the difference between the weekday and evening options and recommend one?", "en-GB"),
+    ("follow_up", "Can you explain whether that fee is refundable and what the refund process is?", "en-GB"),
+    ("multilingual", "कोर्स की फीस कितनी है?", "hi-IN"),
+    ("human_review", "I want to speak to a human manager.", "en-GB"),
 )
 
 
@@ -78,7 +78,7 @@ def run(iterations: int = 20, pricing: Pricing | None = None) -> dict:
 
     rows: list[dict] = []
     for iteration in range(iterations):
-        for name, question, language, expected_llm in CASES:
+        for name, question, language in CASES:
             started = time.perf_counter()
             decision = route_query(question, policy)
             key = cache.key("benchmark-v1", language, question.lower().strip())
@@ -86,7 +86,7 @@ def run(iterations: int = 20, pricing: Pricing | None = None) -> dict:
 
             # Human-review requests are deliberately not sent to the LLM.
             llm_calls = 0 if decision.requires_human_review else (
-                0 if cached else int(decision.answer_mode == "deep" or expected_llm)
+                0 if cached else int(decision.answer_mode == "deep")
             )
             input_tokens = 0
             output_tokens = 0
