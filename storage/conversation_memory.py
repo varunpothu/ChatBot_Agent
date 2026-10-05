@@ -53,7 +53,7 @@ class PostgresConversationMemory:
                     "FOR UPDATE"
                 ),
                 {"conversation_id": db_id},
-            ).scalar_one_or_none()
+            ).first()
             if existing is None:
                 conn.execute(
                     text(
@@ -62,7 +62,15 @@ class PostgresConversationMemory:
                     ),
                     {"conversation_id": db_id, "user_id": user_id},
                 )
-            elif existing != user_id:
+            elif existing[0] is None:
+                conn.execute(
+                    text(
+                        "UPDATE conversations SET user_id=:user_id, updated_at=now() "
+                        "WHERE conversation_id=CAST(:conversation_id AS uuid)"
+                    ),
+                    {"conversation_id": db_id, "user_id": user_id},
+                )
+            elif existing[0] != user_id:
                 raise PermissionError("Conversation belongs to another user.")
 
     def delete(self, conversation_id: str, user_id: str, is_admin: bool = False) -> int:
