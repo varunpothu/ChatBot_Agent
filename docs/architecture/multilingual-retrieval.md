@@ -37,8 +37,14 @@ The model creates a fixed local CPU/RAM cost and a one-time model download, but 
 
 Before production, benchmark the real corpus using Recall@K, NDCG/MRR, p50/p95 latency, CPU/RAM, translation calls avoided and total cost per 1,000 questions.
 
-The repository includes a small benchmark command:
+The repository includes two benchmark entry points. The compact compatibility command is:
 
     coachai-multilingual-benchmark --provider local_e5
+
+The richer evaluation command is:
+
+    python -m evaluation.multilingual_benchmark --provider local_e5
+
+It reports Recall@1, Recall@K, MRR, NDCG@K and p50/p95 retrieval latency across English-source documents and multilingual queries. Use a real centre corpus before treating the results as a deployment gate.
 
 The benchmark is intentionally not treated as a production quality proof. Replace its sample cases with real coaching-centre multilingual golden questions.
