@@ -128,3 +128,28 @@ resource "aws_iam_role_policy" "worker_task" {
   role   = aws_iam_role.worker_task.id
   policy = aws_iam_policy.worker_task.policy
 }
+
+
+resource "aws_iam_role" "retention_task" {
+  name = "${var.project_name}-retention-task"
+
+  assume_role_policy = aws_iam_role.ecs_execution.assume_role_policy
+}
+
+resource "aws_iam_policy" "retention_task" {
+  name = "${var.project_name}-retention-policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["secretsmanager:GetSecretValue"]
+      Resource = aws_secretsmanager_secret.database_url.arn
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "retention_task" {
+  role   = aws_iam_role.retention_task.id
+  policy = aws_iam_policy.retention_task.policy
+}
