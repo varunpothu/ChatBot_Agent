@@ -13,7 +13,7 @@ Required settings:
 `OIDC_ISSUER_URL`
 `OIDC_AUDIENCE`
 
-The application validates issuer, audience, expiry, subject and RS256 signature. Signing keys are resolved from the issuer JWKS endpoint and cached briefly.
+The application validates issuer, audience, expiry, subject and RS256 signature. `OIDC_AUDIENCE` is required in production. Signing keys are resolved from `OIDC_JWKS_URL` when set, otherwise the issuer JWKS endpoint is used, and keys are cached briefly.
 
 ## API Gateway header mode
 
@@ -28,6 +28,6 @@ Only use this mode when untrusted clients cannot bypass the trusted ingress and 
 
 ## Operations
 
-Document ingestion, governance endpoints, KPI data and audit access remain protected by the admin control. Replace the development admin-key mechanism with the final production identity/role mapping before broad public operations access.
+Document ingestion, governance endpoints, KPI data and audit access remain protected by the admin control. In production, complete the account-specific identity-provider role claim mapping and verify that the public ingress cannot bypass the OIDC boundary.
 
 In OIDC or API-Gateway mode, admin operations require the validated principal to have the `admin` role. A shared production admin API key is not required.
