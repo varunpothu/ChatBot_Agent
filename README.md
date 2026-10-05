@@ -10,6 +10,7 @@ Production-oriented RAG coaching-centre assistant designed around four goals:
 - Deep path only when needed: comparison, explanation and multi-part questions may use one small cloud-model call.
 - Adaptive evidence: strong matches may use one chunk, weaker matches use two or three.
 - Tiny structured memory: follow-up questions retain only the previous query and intent, not the full transcript.
+- Conversation privacy: authenticated users own their durable conversations, can delete them, and expired conversations can be purged by retention policy.
 - Response cache: repeated questions reuse verified answers until knowledge generation changes.
 - Low token budgets: input, evidence and output are all capped.
 - Cost firewall: per-client rate limiting and a daily cloud-call budget prevent accidental spend spikes.
