@@ -98,6 +98,13 @@ def test_postgres_retention_removes_expired_conversation_only():
             ),
             {"days": 31, "expired": expired_id, "active": active_id},
         )
+        conn.execute(
+            text(
+                "UPDATE conversations SET updated_at = now() "
+                "WHERE conversation_id = CAST(:active AS uuid)"
+            ),
+            {"active": active_id},
+        )
 
     assert memory.purge_expired(30) >= 1
 
