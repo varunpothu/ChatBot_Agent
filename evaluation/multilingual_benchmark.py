@@ -24,7 +24,7 @@ CASES = [
     ("Quelles sont les heures du cours du soir ?", "schedule", "fr-FR"),
     ("What is the refund window?", "refunds", "en-GB"),
     ("रिफंड कितने दिनों के भीतर माँगना होता है?", "refunds", "hi-IN"),
-    ("환불은 며칠 안에 요청해야 하나요?", "refunds", "ko-KR"),
+    ("ما هي مهلة طلب استرداد الأموال؟", "refunds", "ar-SA"),
     ("Quel est le délai pour demander un remboursement ?", "refunds", "fr-FR"),
 ]
 
