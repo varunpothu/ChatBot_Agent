@@ -43,6 +43,7 @@ coachai-ingestion-worker = "workers.ingestion_worker:main"
 coachai-db-init = "storage.migrate:main"
 coachai-quality-benchmark = "evaluation.benchmark:main"
 coachai-seed-governance = "scripts.seed_governance:main"
+coachai-purge-conversations = "scripts.purge_conversations:main"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
