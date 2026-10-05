@@ -15,3 +15,6 @@ oidc_jwks_url              = ""
 certificate_arn            = "arn:aws:acm:eu-west-2:ACCOUNT:certificate/REPLACE_ME"
 monthly_budget_usd         = 50
 budget_alert_email         = "alerts@example.com"
+
+conversation_retention_days = 30
+conversation_retention_schedule = "cron(0 3 * * ? *)"
