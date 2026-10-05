@@ -6,7 +6,7 @@ CoachAI follows a cost-firewall model.
 
 1. Normalize and cap input.
 2. Detect prompt injection.
-3. Apply a per-client request limit.
+3. Authenticate the caller and apply a per-client, per-capability request limit.
 4. Retrieve only approved evidence.
 5. Use the zero-LLM fast path for simple factual questions.
 6. For a deep question, check the cloud-call budget.
@@ -25,6 +25,7 @@ The development implementation uses process-local memory. In production, move di
 
 - rate limiting: API Gateway/WAF or Redis-compatible shared state
 - response cache: ElastiCache/Redis
+- voice spend: authenticated STT/TTS endpoints, small payload caps and cache hits before provider calls
 - cloud budget: DynamoDB or a cost-control service
 - audit and conversations: PostgreSQL
 - metrics and alerts: CloudWatch
