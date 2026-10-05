@@ -49,6 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_documents_effective ON documents(effective_from, 
 
 CREATE TABLE IF NOT EXISTS conversations (
     conversation_id UUID PRIMARY KEY,
+    user_id TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_intent TEXT
@@ -136,3 +137,9 @@ CREATE INDEX IF NOT EXISTS idx_prompt_registry_active
 
 ALTER TABLE model_registry ADD COLUMN IF NOT EXISTS evaluation_reference TEXT;
 ALTER TABLE prompt_registry ADD COLUMN IF NOT EXISTS evaluation_reference TEXT;
+
+
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS user_id TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_conversations_user_updated
+    ON conversations(user_id, updated_at DESC);
