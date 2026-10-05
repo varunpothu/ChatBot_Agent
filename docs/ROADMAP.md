@@ -76,7 +76,7 @@
 
 1. Finalize the account-specific OIDC role claim mapping and verify ingress cannot bypass identity controls.
 2. Expand the golden corpus with real centre documents, multilingual queries and adversarial evaluation sets.
-3. Automate the retention cleanup command as a scheduled production job.
+3. Run the scheduled retention task in the target AWS account and verify deletion/retention evidence.
 4. Add full deployment SLO dashboards, incident runbooks and restore drills in the target AWS account.
 5. Harden the reference VPC for the target environment if private ECS tasks, VPC endpoints and no-public-IP workloads are required.
 
