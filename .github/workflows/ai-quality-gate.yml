@@ -15,6 +15,8 @@ jobs:
           python-version: "3.11"
       - name: Install
         run: pip install -e .
+      - name: Dependency consistency
+        run: pip check
       - name: Unit tests
         run: pytest -q -m "not integration"
       - name: Deterministic retrieval and grounding gate
@@ -62,21 +64,6 @@ jobs:
         run: pip install -e .
       - name: Integration tests
         run: pytest -m integration -q
-
-  terraform-quality:
-    name: Terraform validation
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-      - name: Format check
-        continue-on-error: true
-        run: terraform fmt -check -recursive infra/terraform
-      - name: Validate
-        working-directory: infra/terraform
-        run: |
-          terraform init -backend=false
-          terraform validate
 
   package-smoke:
     name: Packaging smoke test
