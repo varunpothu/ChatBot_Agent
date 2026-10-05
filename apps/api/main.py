@@ -127,6 +127,7 @@ orchestrator=CoachAIOrchestrator(
 )
 UPLOAD_DIR=Path(os.getenv("DOCUMENT_STORAGE_PATH","data/documents"));UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
 MAX_UPLOAD_BYTES=int(os.getenv("MAX_UPLOAD_MB","25"))*1024*1024
+MAX_STT_BYTES=int(os.getenv("MAX_STT_MB","8"))*1024*1024
 tts_cache=TTLCache(ttl_seconds=int(os.getenv("TTS_CACHE_TTL_SECONDS","3600")),max_items=256)
 
 class ChatRequest(BaseModel):
@@ -300,6 +301,15 @@ async def audit():
         return [e.__dict__ for e in ops.list_audit(200)]
     return [e.__dict__ for e in reversed(ops.audit_events[-200:])]
 
+def authenticate_and_rate_limit(request: Request, scope: str) -> None:
+    principal=require_principal(request)
+    client_ip=request.client.host if request.client else "unknown"
+    client_key=f"{scope}:{principal.user_id}:{client_ip}"
+    if not rate_limiter.allow(client_key):
+        metrics.record("rate_limit_block")
+        raise HTTPException(429,"Too many requests. Please try again shortly.",headers={"Retry-After":"60"})
+
+
 def get_retriever()->HybridRetriever|PostgresHybridRetriever:
     global retriever,retriever_generation
     if retriever is None or retriever_generation!=store.generation:
@@ -313,11 +323,8 @@ def get_retriever()->HybridRetriever|PostgresHybridRetriever:
 @app.post("/chat")
 async def chat(request:Request,payload:ChatRequest):
     principal=require_principal(request)
+    authenticate_and_rate_limit(request,"chat")
     started=time.perf_counter()
-    client_ip=request.client.host if request.client else "unknown"
-    client_key=f"{principal.user_id}:{client_ip}"
-    if not rate_limiter.allow(client_key):
-        metrics.record("rate_limit_block");raise HTTPException(429,"Too many requests. Please try again shortly.",headers={"Retry-After":"60"})
     if payload.language!="auto":
         try:get_language(payload.language)
         except ValueError:raise HTTPException(400,"Unsupported language") from None
@@ -389,7 +396,8 @@ async def upload_document(file:UploadFile=File(...)):
         destination.unlink(missing_ok=True);raise HTTPException(422,f"Document extraction failed: {exc}") from exc
 
 @app.post("/stt")
-async def stt(file:UploadFile=File(...),language:str=Form("en-GB")):
+async def stt(request:Request,file:UploadFile=File(...),language:str=Form("en-GB")):
+    authenticate_and_rate_limit(request,"stt")
     if os.getenv("STT_PROVIDER","browser").lower()!="transcribe":
         raise HTTPException(503,"Server-side STT is disabled. Use browser speech recognition or set STT_PROVIDER=transcribe.")
     try:
@@ -401,6 +409,8 @@ async def stt(file:UploadFile=File(...),language:str=Form("en-GB")):
         audio=await file.read()
         if not audio:
             raise HTTPException(400,"Audio file is empty.")
+        if len(audio)>MAX_STT_BYTES:
+            raise HTTPException(413,f"Audio exceeds MAX_STT_MB={MAX_STT_BYTES//(1024*1024)}.")
         result=await __import__("asyncio").to_thread(AmazonTranscribeStreamingProvider().transcribe,audio,lang.speech_code)
     except HTTPException:
         raise
@@ -410,10 +420,11 @@ async def stt(file:UploadFile=File(...),language:str=Form("en-GB")):
     return result.__dict__
 
 @app.post("/tts")
-async def tts(request:TTSRequest):
-    try:lang=get_language(request.language)
+async def tts(request:Request,payload:TTSRequest):
+    authenticate_and_rate_limit(request,"tts")
+    try:lang=get_language(payload.language)
     except ValueError:raise HTTPException(400,"Unsupported language") from None
-    matching=[v for v in VOICES if v.voice_id==request.voice_id]
+    matching=[v for v in VOICES if v.voice_id==payload.voice_id]
     if not matching:raise HTTPException(400,"Unknown voice")
     voice=matching[0];selected_voice=voice.voice_id
     if voice.language!=lang.code:
@@ -423,7 +434,7 @@ async def tts(request:TTSRequest):
                 replacement=AmazonPollyProvider().resolve_voice(
                     lang.polly_code,
                     voice.gender,
-                    requested_voice_id=voice.voice_id,
+                    requested_voice_id=payload.voice_id,
                     fallback_voice_id=replacement,
                 )
             except Exception:
@@ -431,10 +442,10 @@ async def tts(request:TTSRequest):
         if replacement:selected_voice=replacement
         elif not lang.polly_code:raise HTTPException(503,"Cloud voice is not available for this language. Use browser voice output instead.")
     engine=os.getenv("POLLY_ENGINE","neural")
-    cache_key=AmazonPollyProvider.cache_key(request.text,selected_voice,engine,lang.polly_code or lang.code)
+0
     cached=tts_cache.get(cache_key)
     if cached is not None:return Response(content=cached,media_type="audio/mpeg",headers={"X-TTS-Cache":"HIT"})
-    try:audio=AmazonPollyProvider().synthesize(request.text,selected_voice,lang.polly_code or lang.code)
+    try:audio=AmazonPollyProvider().synthesize(payload.text,selected_voice,lang.polly_code or lang.code)
     except Exception as exc:raise HTTPException(503,f"Voice service unavailable: {exc}") from exc
-    tts_cache.set(cache_key,audio);metrics.record("tts",tts_characters=len(request.text))
+    tts_cache.set(cache_key,audio);metrics.record("tts",tts_characters=len(payload.text))
     return Response(content=audio,media_type="audio/mpeg",headers={"X-TTS-Cache":"MISS"})
