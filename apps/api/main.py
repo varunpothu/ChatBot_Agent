@@ -357,6 +357,16 @@ async def chat(request:Request,payload:ChatRequest):
     if result.get("next_action")=="human_review":
         item=ops.enqueue_review(result.get("reason",result.get("intent","human_review")),payload.message,conversation_id);review_id=item.review_id
         metrics.record("human_escalation");ops.audit("HUMAN_REVIEW_CREATED","system",review_id,{"intent":result.get("intent")})
+    if isinstance(conversation_memory, PostgresConversationMemory):
+        conversation_memory.record_turn(
+            conversation_id=conversation_id,
+            user_text=payload.message,
+            assistant_text=result.get("answer", ""),
+            grounded=not bool(result.get("abstained")),
+            citations_count=len(result.get("citations", [])),
+            latency_ms=elapsed,
+            model_id=os.getenv("BEDROCK_MODEL_ID") if perf.get("llm_called") else None,
+        )
     result["conversation_id"]=conversation_id
     result["principal"]={"user_id":principal.user_id,"role":principal.role}
     if review_id:result["review_id"]=review_id
