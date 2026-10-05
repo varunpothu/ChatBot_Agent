@@ -20,7 +20,7 @@ Checks syntax and imports that are visible to the Python compiler.
 
 `pytest -m integration -q`
 
-The CI integration job starts PostgreSQL with pgvector and Redis. It verifies durable document/chunk persistence, knowledge generation changes, lifecycle activation, shared cache behavior and distributed request limiting.
+The CI integration job starts PostgreSQL with pgvector and Redis. It verifies durable document/chunk persistence, knowledge generation changes, lifecycle activation, conversation ownership/deletion, shared cache behavior and distributed request limiting.
 
 ### Packaging
 
@@ -59,6 +59,7 @@ A release should have:
 5. Compile/static smoke test passing.
 6. A real AWS smoke test for ingestion, retrieval and voice paths.
 7. Representative latency and cost measurements.
+8. Conversation retention/deletion behavior verified for the configured policy.
 8. Authentication, IAM, secrets, network and logging review.
 
 ## Current verification status
