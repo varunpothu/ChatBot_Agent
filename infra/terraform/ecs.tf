@@ -26,6 +26,13 @@ resource "aws_ecs_task_definition" "api" {
   execution_role_arn       = aws_iam_role.ecs_execution.arn
   task_role_arn            = aws_iam_role.app_task.arn
 
+  lifecycle {
+    precondition {
+      condition     = var.auth_mode != "oidc" || (trimspace(var.oidc_issuer_url) != "" && length(var.oidc_audience) > 0)
+      error_message = "AUTH_MODE=oidc requires oidc_issuer_url and at least one oidc_audience value."
+    }
+  }
+
   container_definitions = jsonencode([{
     name      = "api"
     image     = var.app_image
@@ -49,6 +56,7 @@ resource "aws_ecs_task_definition" "api" {
       { name = "AUTH_MODE", value = var.auth_mode },
       { name = "OIDC_ISSUER_URL", value = var.oidc_issuer_url },
       { name = "OIDC_AUDIENCE", value = join(",", var.oidc_audience) },
+      { name = "OIDC_JWKS_URL", value = var.oidc_jwks_url },
       { name = "POSTGRES_AUTO_INIT_SCHEMA", value = "false" }
     ]
     secrets = [
