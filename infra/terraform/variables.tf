@@ -116,3 +116,10 @@ variable "conversation_retention_schedule" {
   default     = "cron(0 3 * * ? *)"
   description = "UTC schedule for conversation retention cleanup."
 }
+
+
+variable "enforce_https" {
+  type        = bool
+  default     = true
+  description = "Require an ACM certificate and HTTPS listener for production deployments."
+}
