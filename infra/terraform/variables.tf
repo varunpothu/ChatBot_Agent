@@ -110,3 +110,9 @@ variable "conversation_retention_days" {
   default     = 30
   description = "Number of days to retain durable conversation records before scheduled deletion."
 }
+
+variable "conversation_retention_schedule" {
+  type        = string
+  default     = "cron(0 3 * * ? *)"
+  description = "UTC schedule for conversation retention cleanup."
+}
