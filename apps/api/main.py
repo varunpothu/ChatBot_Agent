@@ -16,6 +16,7 @@ from agents.cache import TTLCache
 from agents.groq_model import GroqAnswerModel
 from agents.orchestrator import CoachAIOrchestrator
 from agents.conversation import memory
+from storage.conversation_memory import PostgresConversationMemory
 from language.messages import message as localized_message
 from language.registry import get_language
 from knowledge.chunker import semantic_chunks
@@ -118,12 +119,15 @@ else:
     shared_translation_cache=None
     rate_limiter=SlidingWindowLimiter(int(os.getenv("MAX_REQUESTS_PER_MINUTE","30")),60)
 
+conversation_memory = PostgresConversationMemory(postgres_runtime.engine) if postgres_runtime else memory
+
 orchestrator=CoachAIOrchestrator(
     answer_model=build_cloud_model(),
     translator=TranslationService(),
     cloud_budget=CloudBudget(max_llm_calls_per_day=int(os.getenv("MAX_LLM_CALLS_PER_DAY","1000"))),
     cache=shared_cache,
     translation_cache=shared_translation_cache,
+    conversation_memory=conversation_memory,
 )
 UPLOAD_DIR=Path(os.getenv("DOCUMENT_STORAGE_PATH","data/documents"));UPLOAD_DIR.mkdir(parents=True,exist_ok=True)
 MAX_UPLOAD_BYTES=int(os.getenv("MAX_UPLOAD_MB","25"))*1024*1024
@@ -332,6 +336,11 @@ async def chat(request:Request,payload:ChatRequest):
     if payload.conversation_style not in {"friendly","professional","concise"}:raise HTTPException(400,"Unsupported conversation style")
 
     conversation_id=payload.conversation_id or uuid4().hex
+    if hasattr(conversation_memory, "ensure_owner"):
+        try:
+            conversation_memory.ensure_owner(conversation_id, principal.user_id)
+        except PermissionError:
+            raise HTTPException(403, "You do not have access to this conversation.") from None
     orchestrator.retriever=get_retriever();orchestrator.knowledge_generation=store.generation
     result=await orchestrator.run(payload.message,conversation_id,payload.conversation_style,payload.voice_id,payload.language)
     elapsed=(time.perf_counter()-started)*1000
@@ -352,6 +361,26 @@ async def chat(request:Request,payload:ChatRequest):
     result["principal"]={"user_id":principal.user_id,"role":principal.role}
     if review_id:result["review_id"]=review_id
     return result
+
+@app.delete("/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str, request: Request):
+    principal = require_principal(request)
+    deleted = 0
+    if hasattr(conversation_memory, "delete"):
+        if isinstance(conversation_memory, PostgresConversationMemory):
+            deleted = conversation_memory.delete(
+                conversation_id,
+                principal.user_id,
+                is_admin=principal.role == "admin",
+            )
+        else:
+            deleted = int(conversation_memory.delete(conversation_id))
+    if not deleted:
+        raise HTTPException(404, "Conversation not found.")
+    metrics.record("conversation_deleted")
+    ops.audit("CONVERSATION_DELETED", principal.user_id, conversation_id, {})
+    return {"deleted": True, "conversation_id": conversation_id}
+
 
 @app.post("/documents/upload",dependencies=[Depends(require_admin)])
 async def upload_document(file:UploadFile=File(...)):
