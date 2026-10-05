@@ -1,4 +1,10 @@
 resource "aws_lb" "app" {
+  lifecycle {
+    precondition {
+      condition     = !var.enforce_https || trimspace(var.certificate_arn) != ""
+      error_message = "enforce_https=true requires certificate_arn." 
+    }
+  }
   name               = "${var.project_name}-alb"
   internal           = false
   load_balancer_type = "application"
