@@ -32,6 +32,10 @@ Before public exposure, provide an ACM certificate. The deployed API uses `AUTH_
 
 Set `OIDC_ISSUER_URL` and `OIDC_AUDIENCE` in the protected GitHub production environment. Never expose the service publicly with `AUTH_MODE=development`.
 
+## Conversation retention
+
+Set `CONVERSATION_RETENTION_DAYS` to the approved retention period. Run `coachai-purge-conversations` as a scheduled operational job against the production database. User deletion removes conversation state, stored turns and linked human-review records; audit events are retained as operational records.
+
 ## Rollback
 
 Rollback by redeploying the previous immutable ECR image tag and the corresponding Terraform plan. Do not rebuild the image with a moving `latest` tag.
