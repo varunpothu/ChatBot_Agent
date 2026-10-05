@@ -442,7 +442,7 @@ async def tts(request:Request,payload:TTSRequest):
         if replacement:selected_voice=replacement
         elif not lang.polly_code:raise HTTPException(503,"Cloud voice is not available for this language. Use browser voice output instead.")
     engine=os.getenv("POLLY_ENGINE","neural")
-0
+    cache_key=AmazonPollyProvider.cache_key(payload.text,selected_voice,engine,lang.polly_code or lang.code)
     cached=tts_cache.get(cache_key)
     if cached is not None:return Response(content=cached,media_type="audio/mpeg",headers={"X-TTS-Cache":"HIT"})
     try:audio=AmazonPollyProvider().synthesize(payload.text,selected_voice,lang.polly_code or lang.code)
