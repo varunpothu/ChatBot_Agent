@@ -40,3 +40,12 @@ def test_normal_question_is_not_prefixed():
 
     store = PostgresConversationMemory(Engine("What is the course fee?"))
     assert store.resolve("conversation-1", "What documents do I need?") == "What documents do I need?"
+
+
+def test_local_conversation_can_be_deleted():
+    from agents.conversation import ConversationMemory
+
+    store = ConversationMemory()
+    store.remember("conversation-1", "What is the fee?", "fees")
+    assert store.delete("conversation-1") is True
+    assert store.resolve("conversation-1", "And when is it due?") == "And when is it due?"
