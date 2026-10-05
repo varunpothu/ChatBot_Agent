@@ -62,12 +62,13 @@
 - The ingestion worker verifies the S3 SHA-256 manifest and uses SQS long polling with safe retry semantics.
 - Inline ingestion remains the default for local development.
 
-## Still to integrate for a full production deployment
+## Remaining production hardening
 
-1. Replace the development admin-key operations control with the final production identity/role mapping.
-2. Expand the golden corpus with real centre documents, multilingual translated queries and adversarial evaluation sets.
+1. Finalize the account-specific OIDC role claim mapping and verify ingress cannot bypass identity controls.
+2. Expand the golden corpus with real centre documents, multilingual queries and adversarial evaluation sets.
 3. Add formal retention/deletion controls for persisted conversation records.
 4. Add full deployment SLO dashboards, incident runbooks and restore drills in the target AWS account.
+5. Harden the reference VPC for the target environment if private ECS tasks, VPC endpoints and no-public-IP workloads are required.
 
 ## Scale target
 
