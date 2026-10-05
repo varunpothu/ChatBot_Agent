@@ -31,13 +31,13 @@ resource "aws_iam_policy" "app_task" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:PutObject"]
+        Effect = "Allow"
+        Action = ["s3:GetObject", "s3:PutObject"]
         Resource = "${aws_s3_bucket.documents.arn}/*"
       },
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "sqs:SendMessage",
           "sqs:ReceiveMessage",
           "sqs:DeleteMessage",
@@ -47,21 +47,21 @@ resource "aws_iam_policy" "app_task" {
         Resource = aws_sqs_queue.ingestion.arn
       },
       {
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
         Resource = [
           aws_secretsmanager_secret.database_url.arn,
           aws_secretsmanager_secret.redis_url.arn,
         ]
       },
       {
-        Effect   = "Allow"
-        Action   = ["bedrock:InvokeModel"]
+        Effect = "Allow"
+        Action = ["bedrock:InvokeModel"]
         Resource = "*"
       },
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "textract:DetectDocumentText",
           "textract:StartDocumentTextDetection",
           "textract:GetDocumentTextDetection"
@@ -69,8 +69,8 @@ resource "aws_iam_policy" "app_task" {
         Resource = "*"
       },
       {
-        Effect   = "Allow"
-        Action   = [
+        Effect = "Allow"
+        Action = [
           "polly:DescribeVoices",
           "polly:SynthesizeSpeech",
           "transcribe:StartStreamTranscription"
