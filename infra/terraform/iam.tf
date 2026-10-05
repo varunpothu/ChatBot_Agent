@@ -31,8 +31,8 @@ resource "aws_iam_policy" "app_task" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
-        Action = ["s3:GetObject", "s3:PutObject"]
+        Effect   = "Allow"
+        Action   = ["s3:GetObject", "s3:PutObject"]
         Resource = "${aws_s3_bucket.documents.arn}/*"
       },
       {
@@ -55,8 +55,8 @@ resource "aws_iam_policy" "app_task" {
         ]
       },
       {
-        Effect = "Allow"
-        Action = ["bedrock:InvokeModel"]
+        Effect   = "Allow"
+        Action   = ["bedrock:InvokeModel"]
         Resource = "*"
       },
       {
