@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy import text
 
 from knowledge.document_registry import ManagedDocument
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
@@ -150,7 +151,7 @@ def test_postgres_conversation_ownership_and_deletion():
 
     with runtime.engine.connect() as conn:
         count = conn.execute(
-            __import__("sqlalchemy").text(
+            text(
                 "SELECT COUNT(*) FROM conversation_turns "
                 "WHERE conversation_id=CAST(:conversation_id AS uuid)"
             ),
