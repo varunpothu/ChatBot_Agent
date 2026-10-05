@@ -59,6 +59,7 @@ class Metrics:
             "average_latency_ms":round(self.total_latency_ms/self.requests,2) if self.requests else 0,
             "grounded_answer_rate":round(self.successful_answers/self.requests,4) if self.requests else 0,
             "abstention_rate":round(self.abstentions/self.requests,4) if self.requests else 0,
+            "conversation_deleted":self.conversation_deleted,"purge_runs":self.purge_runs,"conversations_deleted":self.conversations_deleted,
         }
 
 metrics=Metrics()
