@@ -22,6 +22,14 @@ Checks syntax and imports that are visible to the Python compiler.
 
 The CI integration job starts PostgreSQL with pgvector and Redis. It verifies durable document/chunk persistence, knowledge generation changes, lifecycle activation, conversation ownership/deletion, shared cache behavior and distributed request limiting.
 
+### Conversation retention
+
+Durable conversations are deleted with their conversation state, stored turns and linked human-review items. The cleanup command is:
+
+    CONVERSATION_RETENTION_DAYS=30 python scripts/purge_conversations.py
+
+The cleanup uses the durable `updated_at` timestamp and bounds the configured retention period to a safe operational range. Verify deletion of expired conversations and preservation of active conversations in the PostgreSQL integration environment.
+
 ### Packaging
 
 `python -m build`
@@ -60,7 +68,7 @@ A release should have:
 6. A real AWS smoke test for ingestion, retrieval and voice paths.
 7. Representative latency and cost measurements.
 8. Conversation retention/deletion behavior verified for the configured policy.
-8. Authentication, IAM, secrets, network and logging review.
+9. Authentication, IAM, secrets, network and logging review.
 
 ## Current verification status
 
