@@ -25,20 +25,72 @@ resource "aws_iam_role" "app_task" {
 }
 
 resource "aws_iam_policy" "app_task" {
-  name = "${var.project_name}-app-policy"
+  name = "${var.project_name}-api-policy"
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
         Effect   = "Allow"
-        Action   = ["s3:GetObject", "s3:PutObject"]
+        Action   = ["s3:PutObject"]
+        Resource = "${aws_s3_bucket.documents.arn}/*"
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["sqs:SendMessage", "sqs:GetQueueAttributes"]
+        Resource = aws_sqs_queue.ingestion.arn
+      },
+      {
+        Effect = "Allow"
+        Action = ["secretsmanager:GetSecretValue"]
+        Resource = [
+          aws_secretsmanager_secret.database_url.arn,
+          aws_secretsmanager_secret.redis_url.arn,
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["bedrock:InvokeModel"]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "polly:DescribeVoices",
+          "polly:SynthesizeSpeech",
+          "transcribe:StartStreamTranscription"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "app_task" {
+  role   = aws_iam_role.app_task.id
+  policy = aws_iam_policy.app_task.policy
+}
+
+resource "aws_iam_role" "worker_task" {
+  name = "${var.project_name}-worker-task"
+
+  assume_role_policy = aws_iam_role.ecs_execution.assume_role_policy
+}
+
+resource "aws_iam_policy" "worker_task" {
+  name = "${var.project_name}-worker-policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:GetObject"]
         Resource = "${aws_s3_bucket.documents.arn}/*"
       },
       {
         Effect = "Allow"
         Action = [
-          "sqs:SendMessage",
           "sqs:ReceiveMessage",
           "sqs:DeleteMessage",
           "sqs:ChangeMessageVisibility",
@@ -67,21 +119,12 @@ resource "aws_iam_policy" "app_task" {
           "textract:GetDocumentTextDetection"
         ]
         Resource = "*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "polly:DescribeVoices",
-          "polly:SynthesizeSpeech",
-          "transcribe:StartStreamTranscription"
-        ]
-        Resource = "*"
       }
     ]
   })
 }
 
-resource "aws_iam_role_policy" "app_task" {
-  role   = aws_iam_role.app_task.id
-  policy = aws_iam_policy.app_task.policy
+resource "aws_iam_role_policy" "worker_task" {
+  role   = aws_iam_role.worker_task.id
+  policy = aws_iam_policy.worker_task.policy
 }
