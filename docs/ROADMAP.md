@@ -42,6 +42,13 @@
 - CloudWatch operations alarms/dashboard and optional AWS budget guardrail
 - Persistent model/prompt registry with evaluation-required activation
 
+### Privacy and operations
+- Authenticated conversation ownership for durable runtime state
+- User-initiated conversation deletion
+- Configurable conversation retention cleanup command
+- Conversation turn persistence for audit/history without replaying the full transcript to the model
+- API/worker IAM separation for least-privilege AWS access
+
 ### AI and AWS provider boundaries
 - Bedrock Nova Micro adapter for low-cost synthesis
 - Bedrock Titan Text Embeddings V2 adapter with configurable dimensions
@@ -66,7 +73,7 @@
 
 1. Finalize the account-specific OIDC role claim mapping and verify ingress cannot bypass identity controls.
 2. Expand the golden corpus with real centre documents, multilingual queries and adversarial evaluation sets.
-3. Add formal retention/deletion controls for persisted conversation records.
+3. Automate the retention cleanup command as a scheduled production job.
 4. Add full deployment SLO dashboards, incident runbooks and restore drills in the target AWS account.
 5. Harden the reference VPC for the target environment if private ECS tasks, VPC endpoints and no-public-IP workloads are required.
 
