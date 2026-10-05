@@ -31,6 +31,13 @@ class ConversationMemory:
             last_intent=intent,
         )
 
+    def delete(self, conversation_id: str) -> bool:
+        return self.states.pop(conversation_id, None) is not None
+
+    def purge_expired(self, retention_days: int) -> int:
+        # Process-local memory has no durable age metadata; nothing persists across restarts.
+        return 0
+
     @staticmethod
     def _looks_like_follow_up(message: str) -> bool:
         text = re.sub(r"\s+", " ", message.lower()).strip()
