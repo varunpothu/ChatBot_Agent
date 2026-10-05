@@ -98,3 +98,9 @@ variable "oidc_audience" {
   default     = []
   description = "Accepted JWT audience values."
 }
+
+variable "oidc_jwks_url" {
+  type        = string
+  default     = ""
+  description = "Optional OIDC JWKS URL override. Leave empty to use the issuer's default JWKS endpoint."
+}
