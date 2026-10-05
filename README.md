@@ -42,6 +42,7 @@ The same API can run in a zero-infrastructure local mode or switch to shared pro
 - `REDIS_URL` enables a shared response/translation cache and an atomic distributed sliding-window request limiter.
 - `INGESTION_MODE=aws_async` moves document processing out of the request path: upload to S3, publish to SQS, then parse/chunk in the worker.
 - `INGESTION_MODE=inline` keeps the current local development path.
+- `CONVERSATION_RETENTION_DAYS` controls durable conversation retention. Run `python scripts/purge_conversations.py` on the configured schedule.
 
 The API does not require PostgreSQL or Redis for a local demo. Production service selection is explicit rather than silently falling back.
 
@@ -68,6 +69,10 @@ Run the real service integration suite when PostgreSQL/pgvector and Redis are av
 Build the distribution smoke test with:
 
     python -m build
+
+For retention cleanup, configure `DATABASE_URL` and optionally `CONVERSATION_RETENTION_DAYS`, then run:
+
+    python scripts/purge_conversations.py
 
 The complete test matrix and release evidence requirements are documented in `docs/testing/TESTING.md` and `docs/release/RELEASE-CHECKLIST.md`.
 
