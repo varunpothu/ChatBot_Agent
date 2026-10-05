@@ -51,7 +51,7 @@ The system intentionally avoids multi-agent LLM loops for ordinary questions. Ag
 
 For AWS, Bedrock prompt caching and intelligent prompt routing can provide additional optimization for supported models, but CoachAI's own deterministic fast/deep gate runs first so simple questions do not need model inference.
 
-For embeddings, the production schema keeps a 512-dimensional pgvector column so managed embedding workers can write durable vectors without recomputing the full corpus on each API restart. The current multilingual E5 path remains an explicit optional retrieval profile for cross-language evaluation.
+For embeddings, the production schema keeps a 512-dimensional pgvector column so managed embedding workers can write durable vectors without recomputing the full corpus on each API restart. The current multilingual E5 path remains an explicit optional retrieval profile for cross-language evaluation. Run `python -m evaluation.multilingual_benchmark --provider local_e5` to measure Recall@1, Recall@K, MRR, NDCG@K and p50/p95 retrieval latency.
 
 ## Testing
 
