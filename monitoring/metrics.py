@@ -40,6 +40,8 @@ class Metrics:
         self.translation_characters+=int(usage.get("translation_characters",0))
         self.tts_characters+=int(usage.get("tts_characters",0))
         if event=="stt":self.stt_calls+=1
+        if event=="conversation_deleted":self.conversation_deleted+=1
+        if event=="conversation_purge":self.purge_runs+=1;self.conversations_deleted+=int(usage.get("count",0))
 
     def snapshot(self):
         return {
