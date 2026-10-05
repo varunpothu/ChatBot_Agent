@@ -7,6 +7,7 @@ from knowledge.document_registry import ManagedDocument
 from rag.models import DocumentChunk, DocumentMetadata, DocumentStatus
 from rag.retrieval import PostgresHybridRetriever
 from storage.postgres import PostgresRuntime
+from storage.conversation_memory import PostgresConversationMemory
 from governance.registry import GovernanceRegistry
 
 pytestmark = pytest.mark.integration
@@ -124,4 +125,36 @@ def test_postgres_governance_requires_evaluation_reference_for_activation():
     )
     assert active.status == "ACTIVE"
     assert active.evaluation_reference == "ci://golden/answer-integration-v1"
+    runtime.engine.dispose()
+
+
+def test_postgres_conversation_ownership_and_deletion():
+    runtime = get_runtime()
+    memory = PostgresConversationMemory(runtime.engine)
+    conversation_id = "11111111-1111-4111-8111-111111111111"
+    memory.ensure_owner(conversation_id, "student-a")
+    with pytest.raises(PermissionError):
+        memory.ensure_owner(conversation_id, "student-b")
+
+    memory.record_turn(
+        conversation_id,
+        "What is the fee?",
+        "The fee is £100.",
+        True,
+        1,
+        12.5,
+        "integration-model",
+    )
+    assert memory.delete(conversation_id, "student-b") == 0
+    assert memory.delete(conversation_id, "student-a") == 1
+
+    with runtime.engine.connect() as conn:
+        count = conn.execute(
+            __import__("sqlalchemy").text(
+                "SELECT COUNT(*) FROM conversation_turns "
+                "WHERE conversation_id=CAST(:conversation_id AS uuid)"
+            ),
+            {"conversation_id": conversation_id},
+        ).scalar_one()
+    assert count == 0
     runtime.engine.dispose()
