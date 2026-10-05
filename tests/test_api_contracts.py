@@ -96,3 +96,23 @@ def test_admin_operations_require_configured_credentials():
             os.environ.pop("ADMIN_API_KEY", None)
         else:
             os.environ["ADMIN_API_KEY"] = previous
+
+
+@pytest.mark.asyncio
+async def test_voice_endpoints_require_upstream_identity(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "api_gateway")
+    monkeypatch.setenv("STT_PROVIDER", "transcribe")
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            stt = await client.post("/stt", files={"file": ("audio.raw", b"audio", "application/octet-stream")})
+            tts = await client.post(
+                "/tts",
+                json={"text": "hello", "voice_id": "Brian", "language": "en-GB"},
+            )
+        assert stt.status_code == 401
+        assert tts.status_code == 401
+    finally:
+        monkeypatch.setenv("AUTH_MODE", "development")
