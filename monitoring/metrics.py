@@ -19,6 +19,9 @@ class Metrics:
     translation_characters: int = 0
     tts_characters: int = 0
     stt_calls: int = 0
+    conversation_deleted: int = 0
+    purge_runs: int = 0
+    conversations_deleted: int = 0
     total_latency_ms: float = 0
 
     def record(self,event:str,latency_ms:float=0,**usage):
