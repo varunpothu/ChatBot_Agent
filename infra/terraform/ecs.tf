@@ -210,10 +210,10 @@ resource "aws_iam_policy" "retention_scheduler" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Effect = "Allow"
-      Action = "ecs:RunTask"
+      Effect   = "Allow"
+      Action   = "ecs:RunTask"
       Resource = aws_ecs_task_definition.retention.arn
-    }, {
+      }, {
       Effect = "Allow"
       Action = "iam:PassRole"
       Resource = [
