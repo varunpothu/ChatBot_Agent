@@ -54,6 +54,16 @@ For AWS, Bedrock prompt caching and intelligent prompt routing can provide addit
 
 For embeddings, the production schema keeps a 512-dimensional pgvector column so managed embedding workers can write durable vectors without recomputing the full corpus on each API restart. The current multilingual E5 path remains an explicit optional retrieval profile for cross-language evaluation. Run `python -m evaluation.multilingual_benchmark --provider local_e5` to measure Recall@1, Recall@K, MRR, NDCG@K and p50/p95 retrieval latency.
 
+## Cost and latency evaluation
+
+CoachAI includes a deterministic benchmark that exercises routing, response-cache behaviour, multilingual requests, human escalation, token estimates and configurable cost assumptions without making paid model calls.
+
+```bash
+python -m evaluation.cost_latency --iterations 20
+```
+
+Use `BENCHMARK_INPUT_COST_PER_1K`, `BENCHMARK_OUTPUT_COST_PER_1K`, and `BENCHMARK_TRANSLATION_COST_PER_1K_CHARS` when producing planning estimates for a chosen provider. The benchmark explicitly labels its token counts as estimates and its latency as local routing/cache overhead, not production AWS latency.
+
 ## Testing
 
 Run the deterministic unit and quality suite:
