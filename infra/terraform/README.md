@@ -25,7 +25,7 @@ Redis in-transit encryption is enabled. citeturn579688search1turn579688
 
 ## Security requirements before public exposure
 
-The generated ALB supports HTTP and optional HTTPS. Supply `certificate_arn` before internet production use. The application task defaults to `AUTH_MODE=api_gateway`; deploy it behind a trusted identity-aware ingress that injects the headers documented in `docs/security/AUTH.md`.
+Production deployments enforce HTTPS with an ACM certificate. Set `certificate_arn` to a valid certificate in the deployment region. HTTP is retained only to redirect to HTTPS. The application task defaults to `AUTH_MODE=api_gateway`; deploy it behind a trusted identity-aware ingress that injects the headers documented in `docs/security/AUTH.md`.
 
 Do not open PostgreSQL or Redis to the internet. Their security groups only allow the application security group.
 
