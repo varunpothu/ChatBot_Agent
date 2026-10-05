@@ -150,3 +150,107 @@ resource "aws_ecs_service" "worker" {
     security_groups  = [aws_security_group.app.id]
   }
 }
+
+
+resource "aws_cloudwatch_log_group" "retention" {
+  name              = "/ecs/${var.project_name}/retention"
+  retention_in_days = 14
+}
+
+resource "aws_ecs_task_definition" "retention" {
+  family                   = "${var.project_name}-retention"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  task_role_arn            = aws_iam_role.retention_task.arn
+
+  container_definitions = jsonencode([{
+    name      = "retention"
+    image     = var.app_image
+    essential = true
+    command   = ["coachai-purge-conversations"]
+    environment = [
+      { name = "APP_ENV", value = "production" },
+      { name = "CONVERSATION_RETENTION_DAYS", value = tostring(var.conversation_retention_days) }
+    ]
+    secrets = [
+      { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
+    ]
+    logConfiguration = {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = aws_cloudwatch_log_group.retention.name
+        awslogs-region        = var.aws_region
+        awslogs-stream-prefix = "retention"
+      }
+    }
+  }])
+}
+
+resource "aws_iam_role" "retention_scheduler" {
+  name = "${var.project_name}-retention-scheduler"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "scheduler.amazonaws.com"
+      }
+      Action = "sts:AssumeRole"
+    }]
+  })
+}
+
+resource "aws_iam_policy" "retention_scheduler" {
+  name = "${var.project_name}-retention-scheduler-policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = "ecs:RunTask"
+      Resource = aws_ecs_task_definition.retention.arn
+    }, {
+      Effect = "Allow"
+      Action = "iam:PassRole"
+      Resource = [
+        aws_iam_role.ecs_execution.arn,
+        aws_iam_role.retention_task.arn
+      ]
+    }]
+  })
+}
+
+resource "aws_iam_role_policy" "retention_scheduler" {
+  role   = aws_iam_role.retention_scheduler.id
+  policy = aws_iam_policy.retention_scheduler.policy
+}
+
+resource "aws_scheduler_schedule" "conversation_retention" {
+  name                         = "${var.project_name}-conversation-retention"
+  schedule_expression          = var.conversation_retention_schedule
+  schedule_expression_timezone = "UTC"
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_ecs_cluster.main.arn
+    role_arn = aws_iam_role.retention_scheduler.arn
+
+    ecs_parameters {
+      task_definition_arn = aws_ecs_task_definition.retention.arn
+      launch_type         = "FARGATE"
+
+      network_configuration {
+        subnets          = aws_subnet.public[*].id
+        security_groups  = [aws_security_group.app.id]
+        assign_public_ip = true
+      }
+    }
+  }
+}
