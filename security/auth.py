@@ -24,6 +24,7 @@ class OIDCValidator:
         self.issuer_url = issuer_url.rstrip("/")
         self.audience = audience
         self.cache_ttl_seconds = cache_ttl_seconds
+        self.jwks_url = os.getenv("OIDC_JWKS_URL", "").strip() or f"{self.issuer_url}/.well-known/jwks.json"
         self._jwks_client = None
 
     def _client(self):
@@ -31,7 +32,7 @@ class OIDCValidator:
             raise RuntimeError("PyJWT is required for AUTH_MODE=oidc.")
         if self._jwks_client is None:
             self._jwks_client = jwt.PyJWKClient(
-                f"{self.issuer_url}/.well-known/jwks.json",
+                self.jwks_url,
                 cache_jwk_set=True,
                 lifespan=self.cache_ttl_seconds,
             )
@@ -40,6 +41,8 @@ class OIDCValidator:
     def validate(self, token: str) -> Principal:
         if jwt is None:
             raise HTTPException(503, "OIDC support is not installed.")
+        if not self.audience:
+            raise HTTPException(503, "OIDC_AUDIENCE is not configured.")
         try:
             signing_key = self._client().get_signing_key_from_jwt(token).key
             claims = jwt.decode(
