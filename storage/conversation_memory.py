@@ -43,6 +43,94 @@ class PostgresConversationMemory:
             ).scalar_one_or_none()
         return f"{previous} {message}" if previous else message
 
+    def ensure_owner(self, conversation_id: str, user_id: str) -> None:
+        db_id = _db_uuid(conversation_id)
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                text(
+                    "SELECT user_id FROM conversations "
+                    "WHERE conversation_id=CAST(:conversation_id AS uuid) "
+                    "FOR UPDATE"
+                ),
+                {"conversation_id": db_id},
+            ).scalar_one_or_none()
+            if existing is None:
+                conn.execute(
+                    text(
+                        "INSERT INTO conversations (conversation_id, user_id) "
+                        "VALUES (CAST(:conversation_id AS uuid), :user_id)"
+                    ),
+                    {"conversation_id": db_id, "user_id": user_id},
+                )
+            elif existing != user_id:
+                raise PermissionError("Conversation belongs to another user.")
+
+    def delete(self, conversation_id: str, user_id: str, is_admin: bool = False) -> int:
+        db_id = _db_uuid(conversation_id)
+        with self.engine.begin() as conn:
+            owner_clause = "" if is_admin else " AND user_id = :user_id"
+            params = {"conversation_id": db_id}
+            if not is_admin:
+                params["user_id"] = user_id
+
+            existing = conn.execute(
+                text(
+                    "SELECT 1 FROM conversations "
+                    "WHERE conversation_id=CAST(:conversation_id AS uuid)"
+                    + owner_clause
+                ),
+                params,
+            ).scalar_one_or_none()
+            if existing is None:
+                return 0
+
+            for table in ("human_review_queue", "conversation_turns", "conversation_state"):
+                conn.execute(
+                    text(
+                        f"DELETE FROM {table} "
+                        "WHERE conversation_id=CAST(:conversation_id AS uuid)"
+                    ),
+                    {"conversation_id": db_id},
+                )
+            conn.execute(
+                text(
+                    "DELETE FROM conversations "
+                    "WHERE conversation_id=CAST(:conversation_id AS uuid)"
+                    + owner_clause
+                ),
+                params,
+            )
+            return 1
+
+    def purge_expired(self, retention_days: int) -> int:
+        retention_days = max(1, min(int(retention_days), 3650))
+        with self.engine.begin() as conn:
+            expired = conn.execute(
+                text(
+                    "SELECT conversation_id FROM conversations "
+                    "WHERE updated_at < now() - (:retention_days * INTERVAL '1 day')"
+                ),
+                {"retention_days": retention_days},
+            ).scalars().all()
+            for conversation_id in expired:
+                cid = str(conversation_id)
+                for table in ("human_review_queue", "conversation_turns", "conversation_state"):
+                    conn.execute(
+                        text(
+                            f"DELETE FROM {table} "
+                            "WHERE conversation_id=CAST(:conversation_id AS uuid)"
+                        ),
+                        {"conversation_id": cid},
+                    )
+                conn.execute(
+                    text(
+                        "DELETE FROM conversations "
+                        "WHERE conversation_id=CAST(:conversation_id AS uuid)"
+                    ),
+                    {"conversation_id": cid},
+                )
+            return len(expired)
+
     def remember(self, conversation_id: str | None, query: str, intent: str) -> None:
         if not conversation_id:
             return
