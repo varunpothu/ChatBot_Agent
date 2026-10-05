@@ -104,3 +104,9 @@ variable "oidc_jwks_url" {
   default     = ""
   description = "Optional OIDC JWKS URL override. Leave empty to use the issuer's default JWKS endpoint."
 }
+
+variable "conversation_retention_days" {
+  type        = number
+  default     = 30
+  description = "Number of days to retain durable conversation records before scheduled deletion."
+}
