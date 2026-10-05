@@ -108,7 +108,7 @@ resource "aws_cloudwatch_metric_alarm" "redis_cpu" {
 
   dimensions = {
     ReplicationGroupId = aws_elasticache_replication_group.main.id
-    Role              = "Primary"
+    Role               = "Primary"
   }
 }
 
